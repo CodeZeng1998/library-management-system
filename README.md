@@ -15,7 +15,7 @@
 - 移动端适配：侧边栏、工具栏、表格和导入控件的响应式布局
 - 罚款管理：缴纳、减免
 - 数据看板、系统配置、操作日志
-- H2 开发数据库默认可直接运行，另提供 MySQL 配置文件
+- 默认使用本地 MySQL 数据库存储
 - 国际化支持：简体中文、繁體中文、英文界面切换，业务枚举和分类字段支持多语言显示
 
 ## 技术栈
@@ -26,14 +26,13 @@
 - Spring Data JPA
 - Thymeleaf
 - Layui 2.x
-- H2 / MySQL 8
+- MySQL 8
 - Maven
 
 ## 快速启动
 
 ```bash
 mvn clean package
-set LMS_REMEMBER_ME_KEY=your-local-random-key
 java -jar target/library-management-system.jar
 ```
 
@@ -50,15 +49,6 @@ admin / admin123
 librarian / librarian123
 ```
 
-H2 控制台：
-
-```text
-http://localhost:8090/h2-console
-JDBC URL: jdbc:h2:mem:lms
-User: sa
-Password: 空
-```
-
 ## 国际化扩展
 
 - 前端页面使用 Thymeleaf `#{...}` 和 `messages*.properties` 管理界面文案，侧边栏语言选择通过 `lang` 参数切换当前会话语言。
@@ -66,7 +56,7 @@ Password: 空
 - 数据库业务字段使用 `localized_text` 表保存翻译，当前已用于图书分类名称；字段维度为 `entityType + entityId + fieldKey + localeTag`。
 - 新增语言时，增加对应 `messages_{locale}.properties`，在 `i18n.js` 和导航语言下拉中加入 locale 选项，并按需写入 `localized_text` 翻译数据。
 
-## 使用 MySQL
+## 数据库初始化
 
 创建数据库：
 
@@ -74,10 +64,10 @@ Password: 空
 CREATE DATABASE library_management_system DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-修改 `src/main/resources/application-mysql.yml` 中的账号密码，然后运行：
+确认 `src/main/resources/application.yml` 中的 MySQL 账号密码可连接本地数据库，然后运行：
 
 ```bash
-java -jar target/library-management-system.jar --spring.profiles.active=mysql
+java -jar target/library-management-system.jar
 ```
 
 ## 后续计划
