@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>用户管理 - 图书管理系统</title>
+    <title th:text="|#{user.list.title} - #{app.name}|">用户管理 - 图书管理系统</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -12,22 +12,22 @@
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
         <div class="topbar">
-            <h1 class="page-title">用户管理</h1>
-            <a class="layui-btn" th:href="@{/users/new}">新增用户</a>
+            <h1 class="page-title" th:text="#{user.list.title}">用户管理</h1>
+            <a class="layui-btn" th:href="@{/users/new}" th:text="#{user.add}">新增用户</a>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
         <section class="panel">
             <table class="layui-table">
-                <thead><tr><th>账号</th><th>邮箱</th><th>昵称</th><th>角色</th><th>状态</th><th>最后登录</th><th>操作</th></tr></thead>
+                <thead><tr><th th:text="#{user.username}">账号</th><th th:text="#{user.email}">邮箱</th><th th:text="#{user.nickname}">昵称</th><th th:text="#{user.role}">角色</th><th th:text="#{user.status}">状态</th><th th:text="#{user.lastLogin}">最后登录</th><th th:text="#{common.operation}">操作</th></tr></thead>
                 <tbody>
                 <tr th:each="user : ${users.content}">
                     <td th:text="${user.username}"></td>
                     <td th:text="${user.email}"></td>
                     <td th:text="${user.nickname}"></td>
-                    <td th:text="${user.role.label}"></td>
-                    <td th:text="${user.status.label}"></td>
+                    <td th:text="${#messages.msg('role.' + user.role.name())}"></td>
+                    <td th:text="${#messages.msg('status.' + user.status.name())}"></td>
                     <td th:text="${user.lastLoginTime == null ? '-' : #temporals.format(user.lastLoginTime, 'yyyy-MM-dd HH:mm')}"></td>
-                    <td><a class="layui-btn layui-btn-xs" th:href="@{/users/{id}/edit(id=${user.id})}">编辑</a></td>
+                    <td><a class="layui-btn layui-btn-xs" th:href="@{/users/{id}/edit(id=${user.id})}" th:text="#{common.edit}">编辑</a></td>
                 </tr>
                 </tbody>
             </table>

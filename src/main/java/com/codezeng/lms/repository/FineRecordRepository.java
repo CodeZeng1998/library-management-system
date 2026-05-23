@@ -7,8 +7,9 @@ import com.codezeng.lms.domain.enums.FineStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface FineRecordRepository extends JpaRepository<FineRecord, Long> {
+public interface FineRecordRepository extends JpaRepository<FineRecord, Long>, JpaSpecificationExecutor<FineRecord> {
 
     boolean existsByReaderAndStatus(Reader reader, FineStatus status);
 

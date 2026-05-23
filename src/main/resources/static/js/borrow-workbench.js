@@ -1,6 +1,7 @@
 (function () {
     const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
     const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+    const i18nSource = document.getElementById('borrowWorkspace');
 
     const state = {
         reader: null,
@@ -33,6 +34,11 @@
 
     if (!els.borrowReaderNo) {
         return;
+    }
+
+    function t(key, fallback, ...args) {
+        const template = i18nSource?.dataset[key] || fallback;
+        return args.reduce((text, value, index) => text.replaceAll(`{${index}}`, value), template);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -121,12 +127,12 @@
     async function scanReader() {
         const readerNo = els.borrowReaderNo.value.trim();
         if (!readerNo) {
-            showToast('error', '请输入读者证号');
+            showToast('error', t('inputReaderNo', '请输入读者证号'));
             beep();
             return;
         }
         try {
-            setStatus(els.readerStatus, 'loading', '正在识别读者...');
+            setStatus(els.readerStatus, 'loading', t('identifyingReader', '正在识别读者...'));
             const data = await apiGet(`/borrow/api/readers/${encodeURIComponent(readerNo)}`);
             state.reader = data.reader;
             renderReader(data.reader);
@@ -134,7 +140,7 @@
                 els.borrowBookIsbn.disabled = false;
                 els.borrowSubmit.disabled = false;
                 els.borrowBookIsbn.focus();
-                els.borrowFlowState.textContent = '等待图书';
+                els.borrowFlowState.textContent = t('waitBook', '等待图书');
             } else {
                 els.borrowBookIsbn.disabled = true;
                 els.borrowSubmit.disabled = true;
@@ -161,13 +167,13 @@
         }
         const isbn = els.borrowBookIsbn.value.trim();
         if (!isbn) {
-            showToast('error', '请输入图书 ISBN');
+            showToast('error', t('inputBookIsbn', '请输入图书 ISBN'));
             beep();
             return;
         }
         try {
             els.borrowSubmit.disabled = true;
-            setStatus(els.bookStatus, 'loading', '正在校验并借出...');
+            setStatus(els.bookStatus, 'loading', t('validatingCheckout', '正在校验并借出...'));
             const data = await apiPostForm('/borrow/api/checkout', {
                 readerNo: state.reader.readerNo,
                 isbn
@@ -189,7 +195,7 @@
     async function queueReturn() {
         const isbn = els.returnBookIsbn.value.trim();
         if (!isbn) {
-            showToast('error', '请输入图书 ISBN');
+            showToast('error', t('inputBookIsbn', '请输入图书 ISBN'));
             beep();
             return;
         }
@@ -197,7 +203,7 @@
             const data = await apiGet(`/borrow/api/returns/resolve?isbn=${encodeURIComponent(isbn)}`);
             const alreadyQueued = state.returnQueue.some((item) => item.record.id === data.record.id);
             if (alreadyQueued) {
-                showToast('error', '该记录已在待还队列中');
+                showToast('error', t('alreadyQueued', '该记录已在待还队列中'));
                 beep();
             } else {
                 state.returnQueue.push({
@@ -221,7 +227,7 @@
 
     async function batchReturn() {
         if (state.returnQueue.length === 0) {
-            showToast('error', '待还队列为空');
+            showToast('error', t('returnQueueEmpty', '待还队列为空'));
             beep();
             return;
         }
@@ -266,14 +272,14 @@
     async function renewByScan() {
         const isbn = els.renewBookIsbn.value.trim();
         if (!isbn) {
-            showToast('error', '请输入图书 ISBN');
+            showToast('error', t('inputBookIsbn', '请输入图书 ISBN'));
             beep();
             return;
         }
         try {
-            setStatus(els.renewStatus, 'loading', '正在续借...');
+            setStatus(els.renewStatus, 'loading', t('renewing', '正在续借...'));
             const data = await apiPostForm('/borrow/api/renew', { isbn });
-            setStatus(els.renewStatus, 'success', `${data.record.bookTitle} 已续借至 ${data.record.dueDate}`);
+            setStatus(els.renewStatus, 'success', t('renewedUntil', '{0} 已续借至 {1}', data.record.bookTitle, data.record.dueDate));
             upsertRecordRow(data.record, false);
             els.renewBookIsbn.value = '';
             els.renewBookIsbn.focus();
@@ -305,10 +311,10 @@
         els.readerStatus.innerHTML = `
             <strong>${escapeHtml(reader.readerNo)} ${escapeHtml(reader.name)}</strong>
             <dl>
-                <div><dt>会员</dt><dd>${escapeHtml(reader.memberLevel)}</dd></div>
-                <div><dt>在借</dt><dd>${reader.activeBorrowCount}/${reader.maxBorrowBooks}</dd></div>
-                <div><dt>押金</dt><dd>${formatMoney(reader.depositAmount)}</dd></div>
-                <div><dt>状态</dt><dd>${escapeHtml(reader.status)}</dd></div>
+                <div><dt>${escapeHtml(t('member', '会员'))}</dt><dd>${escapeHtml(reader.memberLevel)}</dd></div>
+                <div><dt>${escapeHtml(t('activeBorrow', '在借'))}</dt><dd>${reader.activeBorrowCount}/${reader.maxBorrowBooks}</dd></div>
+                <div><dt>${escapeHtml(t('deposit', '押金'))}</dt><dd>${formatMoney(reader.depositAmount)}</dd></div>
+                <div><dt>${escapeHtml(t('status', '状态'))}</dt><dd>${escapeHtml(reader.status)}</dd></div>
             </dl>
             ${blockers}
         `;
@@ -320,8 +326,8 @@
             <strong>${escapeHtml(data.record.bookTitle)}</strong>
             <dl>
                 <div><dt>ISBN</dt><dd>${escapeHtml(data.record.bookIsbn)}</dd></div>
-                <div><dt>应还</dt><dd>${data.record.dueDate}</dd></div>
-                <div><dt>读者</dt><dd>${escapeHtml(data.record.readerName)}</dd></div>
+                <div><dt>${escapeHtml(t('due', '应还'))}</dt><dd>${data.record.dueDate}</dd></div>
+                <div><dt>${escapeHtml(t('reader', '读者'))}</dt><dd>${escapeHtml(data.record.readerName)}</dd></div>
             </dl>
         `;
     }
@@ -332,17 +338,17 @@
         els.borrowBookIsbn.value = '';
         els.borrowBookIsbn.disabled = true;
         els.borrowSubmit.disabled = true;
-        els.borrowFlowState.textContent = '等待读者';
+        els.borrowFlowState.textContent = t('waitReader', '等待读者');
         if (!keepResult) {
-            setStatus(els.readerStatus, 'empty', '等待读者扫描');
-            setStatus(els.bookStatus, 'empty', '等待图书扫描');
+            setStatus(els.readerStatus, 'empty', t('waitReaderScan', '等待读者扫描'));
+            setStatus(els.bookStatus, 'empty', t('waitBookScan', '等待图书扫描'));
         }
         els.borrowReaderNo.focus();
     }
 
     function renderReturnQueue() {
         if (state.returnQueue.length === 0) {
-            els.returnQueue.innerHTML = '<div class="queue-empty">待还队列为空</div>';
+            els.returnQueue.innerHTML = `<div class="queue-empty">${escapeHtml(t('returnQueueEmpty', '待还队列为空'))}</div>`;
         } else {
             els.returnQueue.innerHTML = state.returnQueue.map((item, index) => `
                 <div class="queue-item" data-index="${index}">
@@ -351,10 +357,10 @@
                         <span>${escapeHtml(item.record.readerNo)} ${escapeHtml(item.record.readerName)}</span>
                     </div>
                     <div class="queue-meta">
-                        <span>应还 ${item.record.dueDate}</span>
-                        <span>预计罚款 ${formatMoney(item.estimatedFine)}</span>
+                        <span>${escapeHtml(t('due', '应还'))} ${item.record.dueDate}</span>
+                        <span>${escapeHtml(t('estimatedFine', '预计罚款'))} ${formatMoney(item.estimatedFine)}</span>
                         <button class="mode-chip ${item.mode}" type="button" data-queue-mode="${index}">${modeLabel(item.mode)}</button>
-                        <button class="queue-remove" type="button" data-queue-remove="${index}">移除</button>
+                        <button class="queue-remove" type="button" data-queue-remove="${index}">${escapeHtml(t('remove', '移除'))}</button>
                     </div>
                 </div>
             `).join('');
@@ -373,7 +379,7 @@
             });
         });
         const totalFine = state.returnQueue.reduce((sum, item) => sum + Number(item.estimatedFine || 0), 0);
-        els.returnSummary.textContent = `待还 ${state.returnQueue.length} 本，预计罚款 ${formatMoney(totalFine)}`;
+        els.returnSummary.textContent = t('returnSummary', '待还 {0} 本，预计罚款 {1}', state.returnQueue.length, formatMoney(totalFine));
         els.returnBatch.disabled = state.returnQueue.length === 0;
     }
 
@@ -382,7 +388,7 @@
         els.returnModeBadge.textContent = modeLabel(mode);
         els.returnModeBadge.className = `status-pill ${mode}`;
         if (mode !== 'normal') {
-            showToast('success', `下一本将标记为${modeLabel(mode)}`);
+            showToast('success', t('nextMarked', '下一本将标记为{0}', modeLabel(mode)));
         }
     }
 
@@ -395,15 +401,15 @@
         });
         if (mode === 'borrow') {
             els.borrowReaderNo.focus();
-            els.commandStatus.textContent = '扫码借书';
+            els.commandStatus.textContent = t('scanBorrow', '扫码借书');
         }
         if (mode === 'return') {
             els.returnBookIsbn.focus();
-            els.commandStatus.textContent = '扫码还书';
+            els.commandStatus.textContent = t('scanReturn', '扫码还书');
         }
         if (mode === 'renew') {
             els.renewBookIsbn.focus();
-            els.commandStatus.textContent = '快速续借';
+            els.commandStatus.textContent = t('quickRenew', '快速续借');
         }
     }
 
@@ -435,10 +441,10 @@
     function recordActions(record) {
         const buttons = [];
         if (record.status === 'BORROWED') {
-            buttons.push(`<button class="layui-btn layui-btn-xs" type="button" data-row-action="renew" data-record-id="${record.id}">续借</button>`);
+            buttons.push(`<button class="layui-btn layui-btn-xs" type="button" data-row-action="renew" data-record-id="${record.id}">${escapeHtml(t('renew', '续借'))}</button>`);
         }
         if (record.status === 'BORROWED' || record.status === 'OVERDUE') {
-            buttons.push(`<button class="layui-btn layui-btn-xs layui-btn-normal" type="button" data-row-action="return" data-record-id="${record.id}">归还</button>`);
+            buttons.push(`<button class="layui-btn layui-btn-xs layui-btn-normal" type="button" data-row-action="return" data-record-id="${record.id}">${escapeHtml(t('return', '归还'))}</button>`);
         }
         return buttons.join('');
     }
@@ -484,7 +490,7 @@
     async function parseResponse(response) {
         const data = await response.json().catch(() => null);
         if (!response.ok || (data && data.success === false)) {
-            throw new Error(data?.message || '操作失败');
+            throw new Error(data?.message || t('operationFailed', '操作失败'));
         }
         return data;
     }
@@ -521,12 +527,12 @@
 
     function modeLabel(mode) {
         if (mode === 'damaged') {
-            return '损坏';
+            return t('damaged', '损坏');
         }
         if (mode === 'lost') {
-            return '丢失';
+            return t('lost', '丢失');
         }
-        return '正常归还';
+        return t('normalReturn', '正常归还');
     }
 
     function formatMoney(value) {

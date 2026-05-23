@@ -3,9 +3,11 @@ package com.codezeng.lms.web;
 import com.codezeng.lms.domain.SystemConfig;
 import com.codezeng.lms.repository.OperationLogRepository;
 import com.codezeng.lms.repository.SystemConfigRepository;
+import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.OperationLogService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,23 +23,28 @@ public class SystemController {
     private final SystemConfigRepository systemConfigRepository;
     private final OperationLogRepository operationLogRepository;
     private final OperationLogService operationLogService;
+    private final I18nMessageService i18n;
 
     public SystemController(
             SystemConfigRepository systemConfigRepository,
             OperationLogRepository operationLogRepository,
-            OperationLogService operationLogService) {
+            OperationLogService operationLogService,
+            I18nMessageService i18n) {
         this.systemConfigRepository = systemConfigRepository;
         this.operationLogRepository = operationLogRepository;
         this.operationLogService = operationLogService;
+        this.i18n = i18n;
     }
 
     @GetMapping("/configs")
+    @PreAuthorize("hasAuthority('CONFIG_MANAGE')")
     public String configs(Model model) {
         model.addAttribute("configs", systemConfigRepository.findAll(Sort.by("configKey")));
         return "system/configs";
     }
 
     @PostMapping("/configs")
+    @PreAuthorize("hasAuthority('CONFIG_MANAGE')")
     public String updateConfig(@RequestParam Long id,
                                @RequestParam String configValue,
                                RedirectAttributes redirectAttributes) {
@@ -45,11 +52,12 @@ public class SystemController {
         config.setConfigValue(configValue);
         systemConfigRepository.save(config);
         operationLogService.record("系统管理", "更新配置", config.getConfigKey());
-        redirectAttributes.addFlashAttribute("message", "系统配置已更新");
+        redirectAttributes.addFlashAttribute("message", i18n.get("flash.system.configUpdated"));
         return "redirect:/system/configs";
     }
 
     @GetMapping("/logs")
+    @PreAuthorize("hasAuthority('LOG_VIEW')")
     public String logs(@RequestParam(defaultValue = "0") int page, Model model) {
         model.addAttribute("logs", operationLogRepository.findByDeletedFalse(PageRequest.of(page, 20, Sort.by(Sort.Direction.DESC, "createTime"))));
         return "system/logs";

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security">
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>数据看板 - 图书管理系统</title>
+    <title th:text="|#{dashboard.title} - #{app.name}|">数据看板 - 图书管理系统</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -12,33 +12,78 @@
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
         <div class="topbar">
-            <h1 class="page-title">数据看板</h1>
+            <h1 class="page-title" th:text="#{dashboard.title}">数据看板</h1>
             <form th:action="@{/logout}" method="post">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                 <span sec:authentication="name"></span>
-                <button class="layui-btn layui-btn-sm layui-btn-primary" type="submit">退出</button>
+                <button class="layui-btn layui-btn-sm layui-btn-primary" type="submit" th:text="#{common.logout}">退出</button>
             </form>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
-        <section class="stat-grid">
-            <div class="stat-card"><div class="stat-label">馆藏图书</div><div class="stat-value" th:text="${bookCount}">0</div></div>
-            <div class="stat-card"><div class="stat-label">注册读者</div><div class="stat-value" th:text="${readerCount}">0</div></div>
-            <div class="stat-card"><div class="stat-label">在借数量</div><div class="stat-value" th:text="${activeBorrowCount}">0</div></div>
-            <div class="stat-card"><div class="stat-label">预约记录</div><div class="stat-value" th:text="${reservationCount}">0</div></div>
-        </section>
-        <section class="panel" style="margin-top: 18px;">
-            <h2 style="font-size:18px; margin:0 0 12px;">借阅排行</h2>
-            <table class="layui-table">
-                <thead><tr><th>书名</th><th>作者</th><th>ISBN</th><th>借阅次数</th></tr></thead>
-                <tbody>
-                <tr th:each="book : ${topBooks}">
-                    <td th:text="${book.title}"></td>
-                    <td th:text="${book.author}"></td>
-                    <td th:text="${book.isbn}"></td>
-                    <td th:text="${book.borrowCount}"></td>
-                </tr>
-                </tbody>
-            </table>
+        <section class="dashboard-workspace">
+            <section class="dashboard-metrics">
+                <div class="stat-card"><div class="stat-label" th:text="#{dashboard.books}">馆藏图书</div><div class="stat-value" th:text="${bookCount}">0</div></div>
+                <div class="stat-card"><div class="stat-label" th:text="#{dashboard.readers}">注册读者</div><div class="stat-value" th:text="${readerCount}">0</div></div>
+                <div class="stat-card"><div class="stat-label" th:text="#{dashboard.activeBorrows}">在借数量</div><div class="stat-value" th:text="${activeBorrowCount}">0</div></div>
+                <div class="stat-card"><div class="stat-label" th:text="#{dashboard.reservations}">预约记录</div><div class="stat-value" th:text="${reservationCount}">0</div></div>
+            </section>
+
+            <section class="dashboard-grid">
+                <article class="panel dashboard-panel">
+                    <h2 class="section-title" th:text="#{dashboard.borrowTrend}">借阅趋势</h2>
+                    <ul class="dashboard-list">
+                        <li th:each="point : ${borrowTrend}">
+                            <strong th:text="${point.label()}">05-24</strong>
+                            <span th:text="${point.value()}">0</span>
+                        </li>
+                    </ul>
+                </article>
+                <article class="panel dashboard-panel">
+                    <h2 class="section-title" th:text="#{dashboard.categoryShare}">分类借阅占比</h2>
+                    <ul class="dashboard-list">
+                        <li th:each="item : ${categoryShare}">
+                            <strong th:text="${item.label()}">分类</strong>
+                            <span th:text="${item.value()}">0</span>
+                        </li>
+                    </ul>
+                </article>
+                <article class="panel dashboard-panel">
+                    <h2 class="section-title" th:text="#{dashboard.overdueWarning}">逾期预警</h2>
+                    <ul class="dashboard-list">
+                        <li th:each="record : ${overdueRecords}">
+                            <strong th:text="${record.reader.readerNo + ' ' + record.reader.name}">读者</strong>
+                            <span th:text="${record.dueDate}">日期</span>
+                        </li>
+                    </ul>
+                </article>
+                <article class="panel dashboard-panel">
+                    <h2 class="section-title" th:text="#{dashboard.hotBooks}">热门图书</h2>
+                    <ul class="dashboard-list">
+                        <li th:each="book : ${topBooks}">
+                            <strong th:text="${book.title}">书名</strong>
+                            <span th:text="${book.borrowCount}">0</span>
+                        </li>
+                    </ul>
+                </article>
+                <article class="panel dashboard-panel">
+                    <h2 class="section-title" th:text="#{dashboard.newBooks}">新书推荐</h2>
+                    <ul class="dashboard-list">
+                        <li th:each="book : ${recentBooks}">
+                            <strong th:text="${book.title}">书名</strong>
+                            <span th:text="${book.category != null ? @localizedTextService.categoryName(book.category) : #messages.msg('common.unclassified')}">分类</span>
+                        </li>
+                    </ul>
+                </article>
+                <article class="panel dashboard-panel">
+                    <h2 class="section-title" th:text="#{dashboard.readerActivity}">读者活跃度</h2>
+                    <ul class="dashboard-list">
+                        <li th:each="item : ${readerActivity}">
+                            <strong th:text="${item.label()}">读者</strong>
+                            <span th:text="${item.value()}">0</span>
+                        </li>
+                    </ul>
+                </article>
+            </section>
         </section>
     </main>
 </div>

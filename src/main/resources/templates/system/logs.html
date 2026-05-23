@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>操作日志 - 图书管理系统</title>
+    <title th:text="|#{system.logs.title} - #{app.name}|">操作日志 - 图书管理系统</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -12,11 +12,11 @@
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
         <div class="topbar">
-            <h1 class="page-title">操作日志</h1>
+            <h1 class="page-title" th:text="#{system.logs.title}">操作日志</h1>
         </div>
         <section class="panel">
             <table class="layui-table">
-                <thead><tr><th>时间</th><th>用户</th><th>模块</th><th>操作</th><th>详情</th></tr></thead>
+                <thead><tr><th th:text="#{common.time}">时间</th><th th:text="#{system.logs.user}">用户</th><th th:text="#{system.logs.module}">模块</th><th th:text="#{system.logs.operation}">操作</th><th th:text="#{common.detail}">详情</th></tr></thead>
                 <tbody>
                 <tr th:each="log : ${logs.content}">
                     <td th:text="${#temporals.format(log.createTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
@@ -28,9 +28,9 @@
                 </tbody>
             </table>
             <div class="table-actions">
-                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${logs.hasPrevious()}" th:href="@{/system/logs(page=${logs.number - 1})}">上一页</a>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${logs.hasPrevious()}" th:href="@{/system/logs(page=${logs.number - 1})}" th:text="#{common.previous}">上一页</a>
                 <span th:text="|${logs.number + 1} / ${logs.totalPages == 0 ? 1 : logs.totalPages}|"></span>
-                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${logs.hasNext()}" th:href="@{/system/logs(page=${logs.number + 1})}">下一页</a>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${logs.hasNext()}" th:href="@{/system/logs(page=${logs.number + 1})}" th:text="#{common.next}">下一页</a>
             </div>
         </section>
     </main>

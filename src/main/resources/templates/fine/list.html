@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>罚款管理 - 图书管理系统</title>
+    <title th:text="|#{fine.title} - #{app.name}|">罚款管理 - 图书管理系统</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -12,28 +12,28 @@
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
         <div class="topbar">
-            <h1 class="page-title">罚款管理</h1>
+            <h1 class="page-title" th:text="#{fine.title}">罚款管理</h1>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
         <section class="panel">
             <table class="layui-table">
-                <thead><tr><th>读者</th><th>图书</th><th>原因</th><th>金额</th><th>状态</th><th>缴纳时间</th><th>操作</th></tr></thead>
+                <thead><tr><th th:text="#{borrow.reader}">读者</th><th th:text="#{borrow.book}">图书</th><th th:text="#{fine.reason}">原因</th><th th:text="#{fine.amount}">金额</th><th th:text="#{common.status}">状态</th><th th:text="#{fine.paidAt}">缴纳时间</th><th th:text="#{common.operation}">操作</th></tr></thead>
                 <tbody>
                 <tr th:each="fine : ${fines.content}">
                     <td th:text="${fine.reader.readerNo + ' ' + fine.reader.name}"></td>
                     <td th:text="${fine.borrowRecord != null ? fine.borrowRecord.book.title : '-'}"></td>
                     <td th:text="${fine.reason}"></td>
                     <td th:text="${fine.amount}"></td>
-                    <td th:text="${fine.status.label}"></td>
+                    <td th:text="${#messages.msg('fineStatus.' + fine.status.name())}"></td>
                     <td th:text="${fine.paidAt == null ? '-' : #temporals.format(fine.paidAt, 'yyyy-MM-dd HH:mm')}"></td>
                     <td class="table-actions">
-                        <form th:if="${fine.status.name() == 'UNPAID'}" th:action="@{/fines/{id}/pay(id=${fine.id})}" method="post">
+                        <form th:if="${fine.status.name() == 'UNPAID'}" th:action="@{/fines/{id}/pay(id=${fine.id})}" method="post" sec:authorize="hasAuthority('FINE_PAY')">
                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                            <button class="layui-btn layui-btn-xs" type="submit">缴纳</button>
+                            <button class="layui-btn layui-btn-xs" type="submit" th:text="#{common.pay}">缴纳</button>
                         </form>
-                        <form th:if="${fine.status.name() == 'UNPAID'}" th:action="@{/fines/{id}/waive(id=${fine.id})}" method="post">
+                        <form th:if="${fine.status.name() == 'UNPAID'}" th:action="@{/fines/{id}/waive(id=${fine.id})}" method="post" sec:authorize="hasAuthority('FINE_WAIVE')">
                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                            <button class="layui-btn layui-btn-xs layui-btn-primary" type="submit">减免</button>
+                            <button class="layui-btn layui-btn-xs layui-btn-primary" type="submit" th:text="#{common.waive}">减免</button>
                         </form>
                     </td>
                 </tr>

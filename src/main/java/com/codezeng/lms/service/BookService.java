@@ -7,6 +7,7 @@ import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import com.codezeng.lms.repository.BookCategoryRepository;
 import com.codezeng.lms.repository.BookRepository;
+import com.codezeng.lms.security.DataScopeService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -30,21 +31,25 @@ public class BookService {
     private final BookRepository bookRepository;
     private final BookCategoryRepository categoryRepository;
     private final OperationLogService operationLogService;
+    private final DataScopeService dataScopeService;
+    private final I18nMessageService i18n;
 
-    public BookService(BookRepository bookRepository, BookCategoryRepository categoryRepository, OperationLogService operationLogService) {
+    public BookService(BookRepository bookRepository,
+                       BookCategoryRepository categoryRepository,
+                       OperationLogService operationLogService,
+                       DataScopeService dataScopeService,
+                       I18nMessageService i18n) {
         this.bookRepository = bookRepository;
         this.categoryRepository = categoryRepository;
         this.operationLogService = operationLogService;
+        this.dataScopeService = dataScopeService;
+        this.i18n = i18n;
     }
 
     public Page<Book> search(String keyword, Pageable pageable) {
-        if (!StringUtils.hasText(keyword)) {
-            return bookRepository.findByDeletedFalse(pageable);
-        }
-        String value = keyword.trim();
-        return bookRepository
-                .findByDeletedFalseAndTitleContainingIgnoreCaseOrDeletedFalseAndAuthorContainingIgnoreCaseOrDeletedFalseAndIsbnContainingIgnoreCase(
-                        value, value, value, pageable);
+        BookSearchCriteria criteria = new BookSearchCriteria();
+        criteria.setKeyword(keyword);
+        return search(criteria, pageable);
     }
 
     public Page<Book> search(BookSearchCriteria criteria, Pageable pageable) {
@@ -54,7 +59,7 @@ public class BookService {
     private Specification<Book> toSpecification(BookSearchCriteria criteria) {
         return (root, query, builder) -> {
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(builder.isFalse(root.get("deleted")));
+            predicates.add(dataScopeService.bookScope().toPredicate(root, query, builder));
 
             if (StringUtils.hasText(criteria.getKeyword())) {
                 String keyword = clean(criteria.getKeyword());
@@ -180,7 +185,7 @@ public class BookService {
     public void softDelete(Long id) {
         Book book = bookRepository.findById(id).orElseThrow();
         if (book.getAvailableQuantity() < book.getTotalQuantity()) {
-            throw new IllegalStateException("该图书存在未归还记录，禁止删除");
+            throw new IllegalStateException(i18n.get("error.book.hasActiveBorrows"));
         }
         book.setDeleted(true);
         bookRepository.save(book);
@@ -227,7 +232,7 @@ public class BookService {
 
     public String exportCsv() {
         StringBuilder csv = new StringBuilder("\uFEFFISBN,书名,作者,出版社,分类,总库存,可借库存,位置,价格\n");
-        for (Book book : bookRepository.findByDeletedFalse(Pageable.unpaged()).getContent()) {
+        for (Book book : bookRepository.findAll(dataScopeService.bookScope(), Pageable.unpaged()).getContent()) {
             csv.append(CsvSupport.csv(book.getIsbn())).append(',')
                     .append(CsvSupport.csv(book.getTitle())).append(',')
                     .append(CsvSupport.csv(book.getAuthor())).append(',')

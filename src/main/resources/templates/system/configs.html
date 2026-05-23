@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>系统配置 - 图书管理系统</title>
+    <title th:text="|#{system.config.title} - #{app.name}|">系统配置 - 图书管理系统</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -12,12 +12,12 @@
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
         <div class="topbar">
-            <h1 class="page-title">系统配置</h1>
+            <h1 class="page-title" th:text="#{system.config.title}">系统配置</h1>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
         <section class="panel">
             <table class="layui-table">
-                <thead><tr><th>配置项</th><th>键</th><th>值</th><th>说明</th><th>操作</th></tr></thead>
+                <thead><tr><th th:text="#{system.config.name}">配置项</th><th th:text="#{system.config.key}">键</th><th th:text="#{common.value}">值</th><th th:text="#{common.description}">说明</th><th th:text="#{common.operation}">操作</th></tr></thead>
                 <tbody>
                 <tr th:each="config : ${configs}">
                     <td th:text="${config.displayName}"></td>
@@ -27,7 +27,7 @@
                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                             <input type="hidden" name="id" th:value="${config.id}">
                             <input class="layui-input" style="width: 160px;" name="configValue" th:value="${config.configValue}">
-                            <button class="layui-btn layui-btn-xs" type="submit">保存</button>
+                            <button class="layui-btn layui-btn-xs" type="submit" th:text="#{common.save}">保存</button>
                         </form>
                     </td>
                     <td th:text="${config.description}"></td>

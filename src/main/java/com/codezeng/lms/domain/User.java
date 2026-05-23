@@ -31,6 +31,12 @@ public class User extends BaseEntity {
 
     private String avatarUrl;
 
+    @Column(length = 64)
+    private String managedLocationPrefix;
+
+    @Column(length = 1000)
+    private String permissionCodes;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private UserRole role = UserRole.READER;
@@ -87,6 +93,22 @@ public class User extends BaseEntity {
 
     public void setAvatarUrl(String avatarUrl) {
         this.avatarUrl = avatarUrl;
+    }
+
+    public String getManagedLocationPrefix() {
+        return managedLocationPrefix;
+    }
+
+    public void setManagedLocationPrefix(String managedLocationPrefix) {
+        this.managedLocationPrefix = managedLocationPrefix;
+    }
+
+    public String getPermissionCodes() {
+        return permissionCodes;
+    }
+
+    public void setPermissionCodes(String permissionCodes) {
+        this.permissionCodes = permissionCodes;
     }
 
     public UserRole getRole() {

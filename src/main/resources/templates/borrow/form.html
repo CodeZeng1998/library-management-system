@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>办理借书 - 图书管理系统</title>
+    <title th:text="|#{borrow.new} - #{app.name}|">办理借书 - 图书管理系统</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -12,28 +12,28 @@
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
         <div class="topbar">
-            <h1 class="page-title">办理借书</h1>
-            <a class="layui-btn layui-btn-primary" th:href="@{/borrow}">返回</a>
+            <h1 class="page-title" th:text="#{borrow.new}">办理借书</h1>
+            <a class="layui-btn layui-btn-primary" th:href="@{/borrow}" th:text="#{common.back}">返回</a>
         </div>
         <section class="panel">
             <form class="layui-form" th:action="@{/borrow}" method="post">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                 <div class="form-grid">
                     <div>
-                        <label>图书</label>
+                        <label th:text="#{borrow.book}">图书</label>
                         <select name="bookId" lay-search required>
-                            <option th:each="book : ${books}" th:value="${book.id}" th:text="${book.title + ' / ' + book.isbn + ' / 可借 ' + book.availableQuantity}"></option>
+                            <option th:each="book : ${books}" th:value="${book.id}" th:text="${book.title + ' / ' + book.isbn + ' / ' + #messages.msg('reservation.bookOption', book.availableQuantity)}"></option>
                         </select>
                     </div>
                     <div>
-                        <label>读者</label>
+                        <label th:text="#{borrow.reader}">读者</label>
                         <select name="readerId" lay-search required>
-                            <option th:each="reader : ${readers}" th:value="${reader.id}" th:text="${reader.readerNo + ' / ' + reader.name + ' / ' + reader.memberLevel.label}"></option>
+                            <option th:each="reader : ${readers}" th:value="${reader.id}" th:text="${reader.readerNo + ' / ' + reader.name + ' / ' + #messages.msg('memberLevel.' + reader.memberLevel.name())}"></option>
                         </select>
                     </div>
                 </div>
                 <div style="margin-top: 18px;">
-                    <button class="layui-btn" type="submit">确认借出</button>
+                    <button class="layui-btn" type="submit" th:text="#{borrow.confirmCheckout}">确认借出</button>
                 </div>
             </form>
         </section>

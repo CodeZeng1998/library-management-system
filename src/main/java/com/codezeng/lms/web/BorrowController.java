@@ -9,11 +9,14 @@ import com.codezeng.lms.repository.BookRepository;
 import com.codezeng.lms.repository.BorrowRecordRepository;
 import com.codezeng.lms.repository.FineRecordRepository;
 import com.codezeng.lms.repository.ReaderRepository;
+import com.codezeng.lms.security.DataScopeService;
 import com.codezeng.lms.service.BorrowService;
+import com.codezeng.lms.service.I18nMessageService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,38 +46,51 @@ public class BorrowController {
     private final BorrowRecordRepository borrowRecordRepository;
     private final FineRecordRepository fineRecordRepository;
     private final BorrowService borrowService;
+    private final DataScopeService dataScopeService;
+    private final I18nMessageService i18n;
 
     public BorrowController(
             BookRepository bookRepository,
             ReaderRepository readerRepository,
             BorrowRecordRepository borrowRecordRepository,
             FineRecordRepository fineRecordRepository,
-            BorrowService borrowService) {
+            BorrowService borrowService,
+            DataScopeService dataScopeService,
+            I18nMessageService i18n) {
         this.bookRepository = bookRepository;
         this.readerRepository = readerRepository;
         this.borrowRecordRepository = borrowRecordRepository;
         this.fineRecordRepository = fineRecordRepository;
         this.borrowService = borrowService;
+        this.dataScopeService = dataScopeService;
+        this.i18n = i18n;
     }
 
     @GetMapping
-    public String records(@RequestParam(defaultValue = "0") int page, Model model) {
-        model.addAttribute("records", borrowRecordRepository.findByDeletedFalse(PageRequest.of(page, 12, Sort.by(Sort.Direction.DESC, "createTime"))));
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
+    public String records(@RequestParam(defaultValue = "0") int page,
+                          @RequestParam(defaultValue = "30") int size,
+                          Model model) {
+        int pageSize = Math.min(Math.max(size, 1), 100);
+        model.addAttribute("records", borrowRecordRepository.findAll(dataScopeService.borrowRecordScope(), PageRequest.of(page, pageSize, Sort.by(Sort.Direction.DESC, "createTime"))));
+        model.addAttribute("pageSize", pageSize);
         return "borrow/list";
     }
 
     @GetMapping("/new")
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public String form() {
         return "redirect:/borrow";
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public String borrow(@RequestParam Long bookId,
                          @RequestParam Long readerId,
                          RedirectAttributes redirectAttributes) {
         try {
             borrowService.borrowBook(bookId, readerId);
-            redirectAttributes.addFlashAttribute("message", "借书成功");
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.borrow.success"));
         } catch (IllegalStateException ex) {
             redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }
@@ -82,20 +98,22 @@ public class BorrowController {
     }
 
     @PostMapping("/{id}/return")
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public String returnBook(@PathVariable Long id,
                              @RequestParam(defaultValue = "false") boolean damaged,
                              @RequestParam(defaultValue = "false") boolean lost,
                              RedirectAttributes redirectAttributes) {
         borrowService.returnBook(id, damaged, lost);
-        redirectAttributes.addFlashAttribute("message", "还书处理完成");
+        redirectAttributes.addFlashAttribute("message", i18n.get("flash.borrow.returned"));
         return "redirect:/borrow";
     }
 
     @PostMapping("/{id}/renew")
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public String renew(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
             borrowService.renew(id);
-            redirectAttributes.addFlashAttribute("message", "续借成功");
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.borrow.renewed"));
         } catch (IllegalStateException ex) {
             redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }
@@ -103,33 +121,36 @@ public class BorrowController {
     }
 
     @PostMapping("/overdue-scan")
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public String overdueScan(RedirectAttributes redirectAttributes) {
         borrowService.markOverdueRecords();
-        redirectAttributes.addFlashAttribute("message", "逾期扫描已完成");
+        redirectAttributes.addFlashAttribute("message", i18n.get("flash.borrow.overdueScan"));
         return "redirect:/borrow";
     }
 
     @GetMapping("/api/readers/{readerNo}")
     @ResponseBody
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public ResponseEntity<ReaderLookupResponse> lookupReader(@PathVariable String readerNo) {
         return readerRepository.findByReaderNoAndDeletedFalse(readerNo.trim())
-                .map(reader -> ResponseEntity.ok(new ReaderLookupResponse(true, "读者已识别", toReaderCard(reader))))
+                .map(reader -> ResponseEntity.ok(new ReaderLookupResponse(true, i18n.get("api.borrow.readerFound"), toReaderCard(reader))))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(new ReaderLookupResponse(false, "读者证号不存在", null)));
+                        .body(new ReaderLookupResponse(false, i18n.get("api.borrow.readerNotFound"), null)));
     }
 
     @PostMapping("/api/checkout")
     @ResponseBody
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public ResponseEntity<ActionResponse> checkout(@RequestParam String readerNo,
                                                    @RequestParam String isbn) {
         try {
             Reader reader = readerRepository.findByReaderNoAndDeletedFalse(readerNo.trim())
-                    .orElseThrow(() -> new IllegalStateException("读者证号不存在"));
+                    .orElseThrow(() -> new IllegalStateException(i18n.get("api.borrow.readerNotFound")));
             Long bookId = bookRepository.findByIsbnAndDeletedFalse(isbn.trim())
-                    .orElseThrow(() -> new IllegalStateException("ISBN 不存在"))
+                    .orElseThrow(() -> new IllegalStateException(i18n.get("api.borrow.isbnNotFound")))
                     .getId();
             BorrowRecord record = borrowService.borrowBook(bookId, reader.getId());
-            return ResponseEntity.ok(new ActionResponse(true, "借出成功", toRecordCard(record), toReaderCard(record.getReader())));
+            return ResponseEntity.ok(new ActionResponse(true, i18n.get("api.borrow.checkoutSuccess"), toRecordCard(record), toReaderCard(record.getReader())));
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(new ActionResponse(false, ex.getMessage(), null, null));
         }
@@ -137,18 +158,20 @@ public class BorrowController {
 
     @GetMapping("/api/returns/resolve")
     @ResponseBody
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public ResponseEntity<ReturnResolveResponse> resolveReturn(@RequestParam String isbn) {
         return borrowRecordRepository.findFirstByBook_IsbnAndStatusInAndDeletedFalseOrderByDueDateAsc(isbn.trim(), ACTIVE_STATUSES)
-                .map(record -> ResponseEntity.ok(new ReturnResolveResponse(true, "已加入待还队列", toRecordCard(record), estimateFine(record, false, false))))
+                .map(record -> ResponseEntity.ok(new ReturnResolveResponse(true, i18n.get("api.borrow.returnQueued"), toRecordCard(record), estimateFine(record, false, false))))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(new ReturnResolveResponse(false, "没有找到可归还的在借记录", null, BigDecimal.ZERO)));
+                        .body(new ReturnResolveResponse(false, i18n.get("api.borrow.returnRecordNotFound"), null, BigDecimal.ZERO)));
     }
 
     @PostMapping("/api/returns/batch")
     @ResponseBody
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public ResponseEntity<ReturnBatchResponse> batchReturn(@RequestBody ReturnBatchRequest request) {
         if (request == null || request.items() == null || request.items().isEmpty()) {
-            return ResponseEntity.badRequest().body(new ReturnBatchResponse(false, "待还队列为空", List.of(), List.of(), BigDecimal.ZERO));
+            return ResponseEntity.badRequest().body(new ReturnBatchResponse(false, i18n.get("borrow.returnQueue.empty"), List.of(), List.of(), BigDecimal.ZERO));
         }
 
         List<RecordCard> processed = new ArrayList<>();
@@ -160,25 +183,26 @@ public class BorrowController {
                 processed.add(toRecordCard(returned));
                 totalFine = totalFine.add(returned.getFineAmount());
             } catch (RuntimeException ex) {
-                errors.add("记录 " + item.recordId() + "：" + ex.getMessage());
+                errors.add(i18n.get("api.borrow.recordError", item.recordId(), ex.getMessage()));
             }
         }
 
         String message = errors.isEmpty()
-                ? "批量归还完成，共处理 " + processed.size() + " 本"
-                : "已处理 " + processed.size() + " 本，失败 " + errors.size() + " 本";
+                ? i18n.get("api.borrow.batchReturnSuccess", processed.size())
+                : i18n.get("api.borrow.batchReturnPartial", processed.size(), errors.size());
         return ResponseEntity.ok(new ReturnBatchResponse(errors.isEmpty(), message, processed, errors, totalFine));
     }
 
     @PostMapping("/api/renew")
     @ResponseBody
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public ResponseEntity<ActionResponse> renewByScan(@RequestParam String isbn) {
         try {
             BorrowRecord record = borrowRecordRepository
                     .findFirstByBook_IsbnAndStatusInAndDeletedFalseOrderByDueDateAsc(isbn.trim(), List.of(BorrowStatus.BORROWED))
-                    .orElseThrow(() -> new IllegalStateException("没有找到可续借的在借记录"));
+                    .orElseThrow(() -> new IllegalStateException(i18n.get("api.borrow.renewRecordNotFound")));
             BorrowRecord renewed = borrowService.renew(record.getId());
-            return ResponseEntity.ok(new ActionResponse(true, "续借成功", toRecordCard(renewed), toReaderCard(renewed.getReader())));
+            return ResponseEntity.ok(new ActionResponse(true, i18n.get("flash.borrow.renewed"), toRecordCard(renewed), toReaderCard(renewed.getReader())));
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(new ActionResponse(false, ex.getMessage(), null, null));
         }
@@ -186,10 +210,11 @@ public class BorrowController {
 
     @PostMapping("/api/renew/{id}")
     @ResponseBody
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public ResponseEntity<ActionResponse> renewById(@PathVariable Long id) {
         try {
             BorrowRecord renewed = borrowService.renew(id);
-            return ResponseEntity.ok(new ActionResponse(true, "续借成功", toRecordCard(renewed), toReaderCard(renewed.getReader())));
+            return ResponseEntity.ok(new ActionResponse(true, i18n.get("flash.borrow.renewed"), toRecordCard(renewed), toReaderCard(renewed.getReader())));
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(new ActionResponse(false, ex.getMessage(), null, null));
         }
@@ -201,23 +226,23 @@ public class BorrowController {
         boolean hasUnpaidFine = fineRecordRepository.existsByReaderAndStatus(reader, FineStatus.UNPAID);
         List<String> blockers = new ArrayList<>();
         if (reader.getStatus() != AccountStatus.NORMAL) {
-            blockers.add("账号状态不可借阅");
+            blockers.add(i18n.get("api.borrow.blocker.accountStatus"));
         }
         if (activeBorrowCount >= reader.getMemberLevel().getMaxBorrowBooks()) {
-            blockers.add("已达借阅上限");
+            blockers.add(i18n.get("api.borrow.blocker.maxBorrow"));
         }
         if (hasOverdue) {
-            blockers.add("存在逾期未还图书");
+            blockers.add(i18n.get("api.borrow.blocker.overdue"));
         }
         if (hasUnpaidFine) {
-            blockers.add("存在未缴纳罚款");
+            blockers.add(i18n.get("api.borrow.blocker.unpaidFine"));
         }
         return new ReaderCard(
                 reader.getId(),
                 reader.getReaderNo(),
                 reader.getName(),
-                reader.getMemberLevel().getLabel(),
-                reader.getStatus().getLabel(),
+                i18n.enumLabel("memberLevel", reader.getMemberLevel()),
+                i18n.enumLabel("status", reader.getStatus()),
                 reader.getDepositAmount(),
                 activeBorrowCount,
                 reader.getMemberLevel().getMaxBorrowBooks(),
@@ -238,7 +263,7 @@ public class BorrowController {
                 record.getDueDate(),
                 record.getReturnDate(),
                 record.getStatus().name(),
-                record.getStatus().getLabel(),
+                i18n.enumLabel("borrowStatus", record.getStatus()),
                 record.getFineAmount(),
                 record.getRenewCount());
     }

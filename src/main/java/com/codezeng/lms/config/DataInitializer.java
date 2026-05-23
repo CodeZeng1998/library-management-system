@@ -4,6 +4,7 @@ import com.codezeng.lms.domain.Book;
 import com.codezeng.lms.domain.BookCategory;
 import com.codezeng.lms.domain.BorrowRecord;
 import com.codezeng.lms.domain.FineRecord;
+import com.codezeng.lms.domain.LocalizedText;
 import com.codezeng.lms.domain.Notification;
 import com.codezeng.lms.domain.Reader;
 import com.codezeng.lms.domain.ReservationRecord;
@@ -22,6 +23,7 @@ import com.codezeng.lms.repository.BookCategoryRepository;
 import com.codezeng.lms.repository.BookRepository;
 import com.codezeng.lms.repository.BorrowRecordRepository;
 import com.codezeng.lms.repository.FineRecordRepository;
+import com.codezeng.lms.repository.LocalizedTextRepository;
 import com.codezeng.lms.repository.NotificationRepository;
 import com.codezeng.lms.repository.ReaderRepository;
 import com.codezeng.lms.repository.ReservationRecordRepository;
@@ -49,11 +51,12 @@ public class DataInitializer {
                                ReservationRecordRepository reservationRecordRepository,
                                NotificationRepository notificationRepository,
                                FineRecordRepository fineRecordRepository,
+                               LocalizedTextRepository localizedTextRepository,
                                SystemConfigRepository systemConfigRepository,
                                PasswordEncoder passwordEncoder) {
         return args -> {
             seedUsers(userRepository, passwordEncoder);
-            seedBooks(categoryRepository, bookRepository);
+            seedBooks(categoryRepository, bookRepository, localizedTextRepository);
             seedReaders(readerRepository);
             seedBorrowRecords(bookRepository, readerRepository, borrowRecordRepository);
             seedReservations(bookRepository, readerRepository, reservationRecordRepository);
@@ -72,13 +75,21 @@ public class DataInitializer {
         createUser(userRepository, passwordEncoder, "disabled_user", "disabled@example.com", "停用账号样例", "13800000006", UserRole.READER, AccountStatus.DISABLED, "disabled123");
     }
 
-    private void seedBooks(BookCategoryRepository categoryRepository, BookRepository bookRepository) {
+    private void seedBooks(BookCategoryRepository categoryRepository,
+                           BookRepository bookRepository,
+                           LocalizedTextRepository localizedTextRepository) {
         BookCategory literature = createCategory(categoryRepository, "文学");
         BookCategory technology = createCategory(categoryRepository, "计算机");
         BookCategory history = createCategory(categoryRepository, "历史");
         BookCategory economy = createCategory(categoryRepository, "经济管理");
         BookCategory children = createCategory(categoryRepository, "少儿读物");
         BookCategory science = createCategory(categoryRepository, "自然科学");
+        seedCategoryTranslations(localizedTextRepository, literature, "文學", "Literature");
+        seedCategoryTranslations(localizedTextRepository, technology, "電腦", "Computer Science");
+        seedCategoryTranslations(localizedTextRepository, history, "歷史", "History");
+        seedCategoryTranslations(localizedTextRepository, economy, "經濟管理", "Economics & Management");
+        seedCategoryTranslations(localizedTextRepository, children, "兒童讀物", "Children's Books");
+        seedCategoryTranslations(localizedTextRepository, science, "自然科學", "Natural Sciences");
 
         createBook(bookRepository, "代码整洁之道", "9787115216878", "Robert C. Martin", "人民邮电出版社", technology, 5, 5, LocalDate.of(2010, 1, 1), "59.00", "总馆 A-01-03", 168);
         createBook(bookRepository, "Spring Boot 实战", "9787115487520", "Craig Walls", "人民邮电出版社", technology, 3, 3, LocalDate.of(2018, 9, 1), "79.00", "总馆 A-02-01", 132);
@@ -213,6 +224,33 @@ public class DataInitializer {
             category.setName(name);
             return repository.save(category);
         });
+    }
+
+    private void seedCategoryTranslations(LocalizedTextRepository repository,
+                                          BookCategory category,
+                                          String traditionalChinese,
+                                          String english) {
+        createLocalizedText(repository, "book_category", category.getId(), "name", "zh_CN", category.getName());
+        createLocalizedText(repository, "book_category", category.getId(), "name", "zh_TW", traditionalChinese);
+        createLocalizedText(repository, "book_category", category.getId(), "name", "en", english);
+    }
+
+    private void createLocalizedText(LocalizedTextRepository repository,
+                                     String entityType,
+                                     Long entityId,
+                                     String fieldKey,
+                                     String localeTag,
+                                     String text) {
+        if (repository.existsByEntityTypeAndEntityIdAndFieldKeyAndLocaleTag(entityType, entityId, fieldKey, localeTag)) {
+            return;
+        }
+        LocalizedText localizedText = new LocalizedText();
+        localizedText.setEntityType(entityType);
+        localizedText.setEntityId(entityId);
+        localizedText.setFieldKey(fieldKey);
+        localizedText.setLocaleTag(localeTag);
+        localizedText.setText(text);
+        repository.save(localizedText);
     }
 
     private void createBook(BookRepository repository,

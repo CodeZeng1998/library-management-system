@@ -22,18 +22,21 @@ public class ReservationService {
     private final ReservationRecordRepository reservationRecordRepository;
     private final OperationLogService operationLogService;
     private final NotificationService notificationService;
+    private final I18nMessageService i18n;
 
     public ReservationService(
             BookRepository bookRepository,
             ReaderRepository readerRepository,
             ReservationRecordRepository reservationRecordRepository,
             OperationLogService operationLogService,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            I18nMessageService i18n) {
         this.bookRepository = bookRepository;
         this.readerRepository = readerRepository;
         this.reservationRecordRepository = reservationRecordRepository;
         this.operationLogService = operationLogService;
         this.notificationService = notificationService;
+        this.i18n = i18n;
     }
 
     @Transactional
@@ -41,11 +44,11 @@ public class ReservationService {
         Book book = bookRepository.findById(bookId).orElseThrow();
         Reader reader = readerRepository.findById(readerId).orElseThrow();
         if (book.getAvailableQuantity() > 0) {
-            throw new IllegalStateException("当前仍有可借库存，无需预约");
+            throw new IllegalStateException(i18n.get("error.reservation.inventoryAvailable"));
         }
         long queueSize = reservationRecordRepository.countByBookAndStatus(book, ReservationStatus.WAITING);
         if (queueSize >= 5) {
-            throw new IllegalStateException("该图书预约队列已满");
+            throw new IllegalStateException(i18n.get("error.reservation.queueFull"));
         }
         ReservationRecord record = new ReservationRecord();
         record.setBook(book);

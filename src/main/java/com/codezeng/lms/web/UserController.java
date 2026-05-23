@@ -4,9 +4,11 @@ import com.codezeng.lms.domain.User;
 import com.codezeng.lms.domain.enums.AccountStatus;
 import com.codezeng.lms.domain.enums.UserRole;
 import com.codezeng.lms.repository.UserRepository;
+import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.OperationLogService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -26,32 +28,38 @@ public class UserController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final OperationLogService operationLogService;
+    private final I18nMessageService i18n;
 
-    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder, OperationLogService operationLogService) {
+    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder, OperationLogService operationLogService, I18nMessageService i18n) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.operationLogService = operationLogService;
+        this.i18n = i18n;
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public String list(@RequestParam(defaultValue = "0") int page, Model model) {
         model.addAttribute("users", userRepository.findAll(PageRequest.of(page, 12, Sort.by(Sort.Direction.DESC, "createTime"))));
         return "user/list";
     }
 
     @GetMapping("/new")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public String create(Model model) {
         addFormData(model, new User());
         return "user/form";
     }
 
     @GetMapping("/{id}/edit")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public String edit(@PathVariable Long id, Model model) {
         addFormData(model, userRepository.findById(id).orElseThrow());
         return "user/form";
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public String save(@ModelAttribute User user,
                        @RequestParam(required = false) String rawPassword,
                        RedirectAttributes redirectAttributes) {
@@ -68,7 +76,7 @@ public class UserController {
         }
         userRepository.save(user);
         operationLogService.record("用户管理", "保存用户", user.getUsername());
-        redirectAttributes.addFlashAttribute("message", "用户信息已保存");
+        redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.saved"));
         return "redirect:/users";
     }
 

@@ -5,6 +5,7 @@ import com.codezeng.lms.service.DatabaseUserDetailsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,6 +13,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
@@ -22,9 +24,9 @@ public class SecurityConfig {
         http
                 .userDetailsService(userDetailsService)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/css/**", "/js/**", "/images/**", "/register", "/h2-console/**").permitAll()
+                        .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/register", "/h2-console/**").permitAll()
                         .requestMatchers("/users/**", "/system/**").hasRole(UserRole.SUPER_ADMIN.name())
-                        .requestMatchers("/books/**", "/readers/**", "/borrow/**", "/reservations/**", "/fines/**")
+                        .requestMatchers("/api/**", "/books/**", "/readers/**", "/borrow/**", "/reservations/**", "/fines/**")
                         .hasAnyRole(UserRole.SUPER_ADMIN.name(), UserRole.LIBRARIAN.name())
                         .anyRequest().authenticated()
                 )

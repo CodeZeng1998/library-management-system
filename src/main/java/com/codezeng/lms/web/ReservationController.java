@@ -3,9 +3,12 @@ package com.codezeng.lms.web;
 import com.codezeng.lms.repository.BookRepository;
 import com.codezeng.lms.repository.ReaderRepository;
 import com.codezeng.lms.repository.ReservationRecordRepository;
+import com.codezeng.lms.security.DataScopeService;
+import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.ReservationService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,33 +26,41 @@ public class ReservationController {
     private final BookRepository bookRepository;
     private final ReaderRepository readerRepository;
     private final ReservationService reservationService;
+    private final DataScopeService dataScopeService;
+    private final I18nMessageService i18n;
 
     public ReservationController(
             ReservationRecordRepository reservationRecordRepository,
             BookRepository bookRepository,
             ReaderRepository readerRepository,
-            ReservationService reservationService) {
+            ReservationService reservationService,
+            DataScopeService dataScopeService,
+            I18nMessageService i18n) {
         this.reservationRecordRepository = reservationRecordRepository;
         this.bookRepository = bookRepository;
         this.readerRepository = readerRepository;
         this.reservationService = reservationService;
+        this.dataScopeService = dataScopeService;
+        this.i18n = i18n;
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     public String list(@RequestParam(defaultValue = "0") int page, Model model) {
-        model.addAttribute("reservations", reservationRecordRepository.findByDeletedFalse(PageRequest.of(page, 12, Sort.by(Sort.Direction.DESC, "reservedAt"))));
-        model.addAttribute("books", bookRepository.findByDeletedFalse(PageRequest.of(0, 200, Sort.by("title"))).getContent());
+        model.addAttribute("reservations", reservationRecordRepository.findAll(dataScopeService.reservationScope(), PageRequest.of(page, 12, Sort.by(Sort.Direction.DESC, "reservedAt"))));
+        model.addAttribute("books", bookRepository.findAll(dataScopeService.bookScope(), PageRequest.of(0, 200, Sort.by("title"))).getContent());
         model.addAttribute("readers", readerRepository.findByDeletedFalse(PageRequest.of(0, 200, Sort.by("readerNo"))).getContent());
         return "reservation/list";
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     public String reserve(@RequestParam Long bookId,
                           @RequestParam Long readerId,
                           RedirectAttributes redirectAttributes) {
         try {
             reservationService.reserve(bookId, readerId);
-            redirectAttributes.addFlashAttribute("message", "预约成功");
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.reservation.created"));
         } catch (IllegalStateException ex) {
             redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }
@@ -57,9 +68,10 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     public String cancel(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         reservationService.cancel(id);
-        redirectAttributes.addFlashAttribute("message", "预约已取消");
+        redirectAttributes.addFlashAttribute("message", i18n.get("flash.reservation.cancelled"));
         return "redirect:/reservations";
     }
 }

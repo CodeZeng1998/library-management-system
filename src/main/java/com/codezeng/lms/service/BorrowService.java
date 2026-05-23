@@ -30,6 +30,7 @@ public class BorrowService {
     private final FineRecordRepository fineRecordRepository;
     private final OperationLogService operationLogService;
     private final ReservationService reservationService;
+    private final I18nMessageService i18n;
 
     public BorrowService(
             BookRepository bookRepository,
@@ -37,13 +38,15 @@ public class BorrowService {
             BorrowRecordRepository borrowRecordRepository,
             FineRecordRepository fineRecordRepository,
             OperationLogService operationLogService,
-            ReservationService reservationService) {
+            ReservationService reservationService,
+            I18nMessageService i18n) {
         this.bookRepository = bookRepository;
         this.readerRepository = readerRepository;
         this.borrowRecordRepository = borrowRecordRepository;
         this.fineRecordRepository = fineRecordRepository;
         this.operationLogService = operationLogService;
         this.reservationService = reservationService;
+        this.i18n = i18n;
     }
 
     @Transactional
@@ -114,14 +117,14 @@ public class BorrowService {
     public BorrowRecord renew(Long recordId) {
         BorrowRecord record = borrowRecordRepository.findById(recordId).orElseThrow();
         if (record.getStatus() != BorrowStatus.BORROWED) {
-            throw new IllegalStateException("只有借阅中的记录可以续借");
+            throw new IllegalStateException(i18n.get("error.borrow.onlyBorrowedRenew"));
         }
         int maxRenewCount = record.getReader().getMemberLevel().getMaxRenewCount();
         if (record.getRenewCount() >= maxRenewCount) {
-            throw new IllegalStateException("已达到最大续借次数");
+            throw new IllegalStateException(i18n.get("error.borrow.maxRenew"));
         }
         if (record.getDueDate().isBefore(LocalDate.now())) {
-            throw new IllegalStateException("逾期记录不能续借");
+            throw new IllegalStateException(i18n.get("error.borrow.overdueRenew"));
         }
         record.setRenewCount(record.getRenewCount() + 1);
         record.setDueDate(record.getDueDate().plusDays(record.getReader().getMemberLevel().getBorrowDays()));
@@ -142,28 +145,28 @@ public class BorrowService {
 
     private boolean validateBorrow(Book book, Reader reader) {
         if (book.isDeleted() || reader.isDeleted()) {
-            throw new IllegalStateException("图书或读者不存在");
+            throw new IllegalStateException(i18n.get("error.borrow.bookOrReaderNotFound"));
         }
         if (book.isReferenceOnly()) {
-            throw new IllegalStateException("该图书仅限馆内阅读");
+            throw new IllegalStateException(i18n.get("error.borrow.referenceOnly"));
         }
         if (reader.getStatus() != AccountStatus.NORMAL) {
-            throw new IllegalStateException("读者账号状态不允许借阅");
+            throw new IllegalStateException(i18n.get("error.borrow.accountStatus"));
         }
         long activeBorrows = borrowRecordRepository.countByReaderAndStatusIn(
                 reader, List.of(BorrowStatus.BORROWED, BorrowStatus.OVERDUE));
         if (activeBorrows >= reader.getMemberLevel().getMaxBorrowBooks()) {
-            throw new IllegalStateException("已达到借阅上限");
+            throw new IllegalStateException(i18n.get("error.borrow.maxBorrow"));
         }
         if (borrowRecordRepository.existsByReaderAndStatusAndDueDateBefore(reader, BorrowStatus.BORROWED, LocalDate.now())) {
-            throw new IllegalStateException("存在逾期未还图书");
+            throw new IllegalStateException(i18n.get("error.borrow.overdueBook"));
         }
         if (fineRecordRepository.existsByReaderAndStatus(reader, FineStatus.UNPAID)) {
-            throw new IllegalStateException("存在未缴纳罚款");
+            throw new IllegalStateException(i18n.get("error.borrow.unpaidFine"));
         }
         boolean hasLockedReservation = reservationService.hasActiveNotifiedReservation(book, reader);
         if (book.getAvailableQuantity() <= 0 && !hasLockedReservation) {
-            throw new IllegalStateException("库存不足，请先预约");
+            throw new IllegalStateException(i18n.get("error.borrow.noInventory"));
         }
         return hasLockedReservation;
     }

@@ -1,9 +1,11 @@
 package com.codezeng.lms.web;
 
 import com.codezeng.lms.repository.NotificationRepository;
+import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.NotificationService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,13 +21,16 @@ public class NotificationController {
 
     private final NotificationRepository notificationRepository;
     private final NotificationService notificationService;
+    private final I18nMessageService i18n;
 
-    public NotificationController(NotificationRepository notificationRepository, NotificationService notificationService) {
+    public NotificationController(NotificationRepository notificationRepository, NotificationService notificationService, I18nMessageService i18n) {
         this.notificationRepository = notificationRepository;
         this.notificationService = notificationService;
+        this.i18n = i18n;
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('NOTIFICATION_VIEW')")
     public String list(@RequestParam(defaultValue = "0") int page, Model model) {
         model.addAttribute("notifications", notificationRepository.findByDeletedFalse(
                 PageRequest.of(page, 12, Sort.by(Sort.Direction.DESC, "sentAt"))));
@@ -33,9 +38,10 @@ public class NotificationController {
     }
 
     @PostMapping("/{id}/read")
+    @PreAuthorize("hasAuthority('NOTIFICATION_VIEW')")
     public String markRead(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         notificationService.markRead(id);
-        redirectAttributes.addFlashAttribute("message", "消息已标记为已读");
+        redirectAttributes.addFlashAttribute("message", i18n.get("flash.notification.read"));
         return "redirect:/notifications";
     }
 }

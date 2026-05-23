@@ -16,6 +16,7 @@
 - 罚款管理：缴纳、减免
 - 数据看板、系统配置、操作日志
 - H2 开发数据库默认可直接运行，另提供 MySQL 配置文件
+- 国际化支持：简体中文、繁體中文、英文界面切换，业务枚举和分类字段支持多语言显示
 
 ## 技术栈
 
@@ -32,6 +33,7 @@
 
 ```bash
 mvn clean package
+set LMS_REMEMBER_ME_KEY=your-local-random-key
 java -jar target/library-management-system.jar
 ```
 
@@ -56,6 +58,13 @@ JDBC URL: jdbc:h2:mem:lms
 User: sa
 Password: 空
 ```
+
+## 国际化扩展
+
+- 前端页面使用 Thymeleaf `#{...}` 和 `messages*.properties` 管理界面文案，侧边栏语言选择通过 `lang` 参数切换当前会话语言。
+- 后端控制器和扫码接口通过 `MessageSource` 解析提示文案、枚举标签和 API 返回消息。
+- 数据库业务字段使用 `localized_text` 表保存翻译，当前已用于图书分类名称；字段维度为 `entityType + entityId + fieldKey + localeTag`。
+- 新增语言时，增加对应 `messages_{locale}.properties`，在 `i18n.js` 和导航语言下拉中加入 locale 选项，并按需写入 `localized_text` 翻译数据。
 
 ## 使用 MySQL
 
