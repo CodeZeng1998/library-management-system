@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>图书管理 - 图书管理系统</title>
+    <title>图书检索 - 图书管理系统</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -12,32 +12,143 @@
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
         <div class="topbar">
-            <h1 class="page-title">图书管理</h1>
+            <h1 class="page-title">图书检索</h1>
             <div class="table-actions">
                 <a class="layui-btn layui-btn-primary" th:href="@{/books/export}">导出CSV</a>
                 <a class="layui-btn" th:href="@{/books/new}">新增图书</a>
             </div>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
+
+        <section class="panel search-builder">
+            <form id="bookSearchForm" th:action="@{/books}" method="get">
+                <div class="quick-search-row">
+                    <label class="quick-search">
+                        <span>快速搜索</span>
+                        <input class="layui-input" name="keyword" list="bookSuggestions" th:value="${criteria.keyword}" placeholder="书名 / 作者 / ISBN / 分类 / 馆藏地">
+                    </label>
+                    <button class="layui-btn" type="submit">搜索</button>
+                    <a class="layui-btn layui-btn-primary" th:href="@{/books}">重置</a>
+                </div>
+
+                <datalist id="bookSuggestions">
+                    <option th:each="suggestion : ${suggestions}" th:value="${suggestion}"></option>
+                </datalist>
+
+                <details class="advanced-search" th:open="${criteria.title != null || criteria.author != null || !criteria.categoryIds.isEmpty() || criteria.publishYearFrom != null || criteria.publishYearTo != null || criteria.availableOnly || criteria.location != null}">
+                    <summary>高级检索</summary>
+                    <div class="advanced-grid">
+                        <label class="condition-row">
+                            <span>书名</span>
+                            <select name="titleMatch" class="layui-select">
+                                <option value="contains" th:selected="${criteria.titleMatch == 'contains'}">包含</option>
+                                <option value="exact" th:selected="${criteria.titleMatch == 'exact'}">精确</option>
+                            </select>
+                            <input class="layui-input" name="title" list="bookSuggestions" th:value="${criteria.title}" placeholder="输入书名">
+                        </label>
+                        <label class="condition-row">
+                            <span>作者</span>
+                            <select name="authorMatch" class="layui-select">
+                                <option value="contains" th:selected="${criteria.authorMatch == 'contains'}">包含</option>
+                                <option value="exact" th:selected="${criteria.authorMatch == 'exact'}">精确</option>
+                            </select>
+                            <input class="layui-input" name="author" list="bookSuggestions" th:value="${criteria.author}" placeholder="输入作者">
+                        </label>
+                        <div class="condition-row category-condition">
+                            <span>分类</span>
+                            <div class="category-checks">
+                                <label th:each="category : ${categories}">
+                                    <input type="checkbox" name="categoryIds" th:value="${category.id}" th:checked="${criteria.categoryIds.contains(category.id)}">
+                                    <span th:text="${category.name}"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="condition-row year-condition">
+                            <span>出版年份</span>
+                            <input class="layui-input" type="number" name="publishYearFrom" min="1900" max="2100" th:value="${criteria.publishYearFrom}" placeholder="起始">
+                            <em>至</em>
+                            <input class="layui-input" type="number" name="publishYearTo" min="1900" max="2100" th:value="${criteria.publishYearTo}" placeholder="结束">
+                        </div>
+                        <label class="condition-row">
+                            <span>馆藏地</span>
+                            <select class="layui-select" name="location">
+                                <option value="">全部馆藏地</option>
+                                <option th:each="location : ${locations}" th:value="${location}" th:text="${location}" th:selected="${criteria.location == location}"></option>
+                            </select>
+                        </label>
+                        <label class="availability-filter">
+                            <input type="checkbox" name="availableOnly" value="true" th:checked="${criteria.availableOnly}">
+                            <span>仅显示有库存</span>
+                        </label>
+                    </div>
+                </details>
+
+                <div class="search-options">
+                    <fieldset class="option-group">
+                        <legend>排序</legend>
+                        <label><input type="radio" name="sort" value="relevance" th:checked="${criteria.sort == 'relevance'}"> 相关度</label>
+                        <label><input type="radio" name="sort" value="publishDateDesc" th:checked="${criteria.sort == 'publishDateDesc'}"> 出版时间↓</label>
+                        <label><input type="radio" name="sort" value="publishDateAsc" th:checked="${criteria.sort == 'publishDateAsc'}"> 出版时间↑</label>
+                        <label><input type="radio" name="sort" value="borrowHot" th:checked="${criteria.sort == 'borrowHot'}"> 借阅热度</label>
+                        <label><input type="radio" name="sort" value="titleAsc" th:checked="${criteria.sort == 'titleAsc'}"> 书名A-Z</label>
+                    </fieldset>
+                    <fieldset class="option-group">
+                        <legend>视图</legend>
+                        <label><input type="radio" name="view" value="card" th:checked="${criteria.view == 'card'}"> 卡片</label>
+                        <label><input type="radio" name="view" value="list" th:checked="${criteria.view == 'list'}"> 列表</label>
+                        <label><input type="radio" name="view" value="detail" th:checked="${criteria.view == 'detail'}"> 详细</label>
+                    </fieldset>
+                    <button class="layui-btn layui-btn-primary" type="button" id="saveBookSearch">保存为常用检索</button>
+                </div>
+            </form>
+
+            <div class="saved-searches">
+                <div>
+                    <strong>检索历史</strong>
+                    <div class="search-chip-row" id="bookSearchHistory"></div>
+                </div>
+                <div>
+                    <strong>常用检索</strong>
+                    <div class="search-chip-row" id="bookSearchFavorites"></div>
+                </div>
+            </div>
+        </section>
+
         <section class="panel">
-            <form class="table-toolbar" th:action="@{/books}" method="get">
-                <input class="layui-input" style="max-width: 360px;" name="keyword" th:value="${keyword}" placeholder="书名 / 作者 / ISBN">
-                <button class="layui-btn layui-btn-primary" type="submit">搜索</button>
-            </form>
-            <form class="import-bar" th:action="@{/books/import}" method="post" enctype="multipart/form-data">
-                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                <input class="layui-input" type="file" name="file" accept=".csv" required>
-                <button class="layui-btn" type="submit">批量导入</button>
-                <span class="hint">CSV列：ISBN,书名,作者,出版社,分类,总库存,可借库存,位置,价格</span>
-            </form>
-            <table class="layui-table responsive-table">
-                <thead><tr><th>书名</th><th>ISBN</th><th>作者</th><th>分类</th><th>库存</th><th>位置</th><th>操作</th></tr></thead>
+            <div class="table-toolbar">
+                <h2 class="section-title" th:text="|检索结果（${books.totalElements}）|">检索结果</h2>
+                <span class="hint">快速搜索支持分类拼音首字母，例如输入 jsj 可匹配“计算机”。</span>
+            </div>
+
+            <div class="book-card-grid" th:if="${criteria.view == 'card'}">
+                <article class="book-card" th:each="book : ${books.content}">
+                    <div class="book-cover">
+                        <img th:if="${book.coverUrl != null and !#strings.isEmpty(book.coverUrl)}" th:src="${book.coverUrl}" th:alt="${book.title}">
+                        <span th:if="${book.coverUrl == null or #strings.isEmpty(book.coverUrl)}" th:text="${#strings.abbreviate(book.title, 8)}"></span>
+                    </div>
+                    <div class="book-card-body">
+                        <h3 th:text="${book.title}"></h3>
+                        <p th:text="${book.author}"></p>
+                        <div class="book-meta">
+                            <span th:text="${book.category != null ? book.category.name : '未分类'}"></span>
+                            <span th:text="${book.publishDate != null ? #temporals.format(book.publishDate, 'yyyy') : '年份未知'}"></span>
+                        </div>
+                        <div class="availability" th:classappend="${book.availableQuantity > 0 ? ' available' : ' unavailable'}" th:text="${book.availableQuantity > 0 ? '可借 ' + book.availableQuantity + '/' + book.totalQuantity : '暂无库存'}"></div>
+                        <div class="book-location" th:text="${book.location ?: '位置未登记'}"></div>
+                        <a class="layui-btn layui-btn-xs" th:href="@{/books/{id}/edit(id=${book.id})}">编辑</a>
+                    </div>
+                </article>
+            </div>
+
+            <table class="layui-table responsive-table" th:if="${criteria.view == 'list'}">
+                <thead><tr><th>书名</th><th>ISBN</th><th>作者</th><th>分类</th><th>出版年份</th><th>库存</th><th>位置</th><th>操作</th></tr></thead>
                 <tbody>
                 <tr th:each="book : ${books.content}">
                     <td th:text="${book.title}"></td>
                     <td th:text="${book.isbn}"></td>
                     <td th:text="${book.author}"></td>
                     <td th:text="${book.category != null ? book.category.name : '-'}"></td>
+                    <td th:text="${book.publishDate != null ? #temporals.format(book.publishDate, 'yyyy') : '-'}"></td>
                     <td th:text="${book.availableQuantity + '/' + book.totalQuantity}"></td>
                     <td th:text="${book.location}"></td>
                     <td class="table-actions">
@@ -50,14 +161,53 @@
                 </tr>
                 </tbody>
             </table>
-            <div class="table-actions">
-                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${books.hasPrevious()}" th:href="@{/books(page=${books.number - 1}, keyword=${keyword})}">上一页</a>
-                <span th:text="|${books.number + 1} / ${books.totalPages == 0 ? 1 : books.totalPages}|"></span>
-                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${books.hasNext()}" th:href="@{/books(page=${books.number + 1}, keyword=${keyword})}">下一页</a>
+
+            <div class="book-detail-list" th:if="${criteria.view == 'detail'}">
+                <article class="book-detail-item" th:each="book : ${books.content}">
+                    <div class="book-cover">
+                        <img th:if="${book.coverUrl != null and !#strings.isEmpty(book.coverUrl)}" th:src="${book.coverUrl}" th:alt="${book.title}">
+                        <span th:if="${book.coverUrl == null or #strings.isEmpty(book.coverUrl)}" th:text="${#strings.abbreviate(book.title, 8)}"></span>
+                    </div>
+                    <div>
+                        <h3 th:text="${book.title}"></h3>
+                        <dl class="detail-meta">
+                            <div><dt>作者</dt><dd th:text="${book.author}"></dd></div>
+                            <div><dt>ISBN</dt><dd th:text="${book.isbn}"></dd></div>
+                            <div><dt>出版社</dt><dd th:text="${book.publisher}"></dd></div>
+                            <div><dt>分类</dt><dd th:text="${book.category != null ? book.category.name : '-'}"></dd></div>
+                            <div><dt>出版日期</dt><dd th:text="${book.publishDate ?: '-'}"></dd></div>
+                            <div><dt>借阅热度</dt><dd th:text="${book.borrowCount}"></dd></div>
+                            <div><dt>可借库存</dt><dd th:text="${book.availableQuantity + '/' + book.totalQuantity}"></dd></div>
+                            <div><dt>馆藏地</dt><dd th:text="${book.location ?: '-'}"></dd></div>
+                        </dl>
+                        <p class="book-summary" th:text="${book.summary ?: '暂无简介。'}"></p>
+                        <a class="layui-btn layui-btn-xs" th:href="@{/books/{id}/edit(id=${book.id})}">编辑</a>
+                    </div>
+                </article>
             </div>
+
+            <div class="empty-result" th:if="${books.totalElements == 0}">
+                没有找到符合条件的图书，请减少筛选条件后重试。
+            </div>
+
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${books.hasPrevious()}" th:href="@{|/books?page=${books.number - 1}${queryString}|}">上一页</a>
+                <span th:text="|${books.number + 1} / ${books.totalPages == 0 ? 1 : books.totalPages}|"></span>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${books.hasNext()}" th:href="@{|/books?page=${books.number + 1}${queryString}|}">下一页</a>
+            </div>
+        </section>
+
+        <section class="panel">
+            <form class="import-bar" th:action="@{/books/import}" method="post" enctype="multipart/form-data">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <input class="layui-input" type="file" name="file" accept=".csv" required>
+                <button class="layui-btn" type="submit">批量导入</button>
+                <span class="hint">CSV列：ISBN,书名,作者,出版社,分类,总库存,可借库存,位置,价格</span>
+            </form>
         </section>
     </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
+<script th:src="@{/js/book-search.js}"></script>
 </body>
 </html>

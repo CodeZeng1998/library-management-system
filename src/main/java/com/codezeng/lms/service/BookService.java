@@ -2,10 +2,14 @@ package com.codezeng.lms.service;
 
 import com.codezeng.lms.domain.Book;
 import com.codezeng.lms.domain.BookCategory;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import com.codezeng.lms.repository.BookCategoryRepository;
 import com.codezeng.lms.repository.BookRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -13,7 +17,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 @Service
 public class BookService {
@@ -36,6 +45,120 @@ public class BookService {
         return bookRepository
                 .findByDeletedFalseAndTitleContainingIgnoreCaseOrDeletedFalseAndAuthorContainingIgnoreCaseOrDeletedFalseAndIsbnContainingIgnoreCase(
                         value, value, value, pageable);
+    }
+
+    public Page<Book> search(BookSearchCriteria criteria, Pageable pageable) {
+        return bookRepository.findAll(toSpecification(criteria), pageable);
+    }
+
+    private Specification<Book> toSpecification(BookSearchCriteria criteria) {
+        return (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(builder.isFalse(root.get("deleted")));
+
+            if (StringUtils.hasText(criteria.getKeyword())) {
+                String keyword = clean(criteria.getKeyword());
+                String like = contains(keyword);
+                Join<Book, BookCategory> category = root.join("category", JoinType.LEFT);
+                List<Predicate> keywordPredicates = new ArrayList<>();
+                for (String variant : variants(keyword)) {
+                    String variantLike = contains(variant);
+                    keywordPredicates.add(builder.like(builder.lower(root.get("title")), variantLike));
+                    keywordPredicates.add(builder.like(builder.lower(root.get("author")), variantLike));
+                    keywordPredicates.add(builder.like(builder.lower(root.get("isbn")), variantLike));
+                    keywordPredicates.add(builder.like(builder.lower(root.get("publisher")), variantLike));
+                    keywordPredicates.add(builder.like(builder.lower(root.get("location")), variantLike));
+                    keywordPredicates.add(builder.like(builder.lower(category.get("name")), variantLike));
+                }
+                categoryIdsByInitials(keyword).forEach(id -> keywordPredicates.add(builder.equal(category.get("id"), id)));
+                predicates.add(builder.or(keywordPredicates.toArray(Predicate[]::new)));
+            }
+
+            if (StringUtils.hasText(criteria.getTitle())) {
+                predicates.add(textPredicate(builder, builder.lower(root.get("title")), criteria.getTitle(), criteria.getTitleMatch()));
+            }
+            if (StringUtils.hasText(criteria.getAuthor())) {
+                predicates.add(textPredicate(builder, builder.lower(root.get("author")), criteria.getAuthor(), criteria.getAuthorMatch()));
+            }
+            if (criteria.getCategoryIds() != null && !criteria.getCategoryIds().isEmpty()) {
+                Join<Book, BookCategory> category = root.join("category", JoinType.LEFT);
+                predicates.add(category.get("id").in(criteria.getCategoryIds()));
+            }
+            if (criteria.getPublishYearFrom() != null) {
+                predicates.add(builder.greaterThanOrEqualTo(root.get("publishDate"), LocalDate.of(criteria.getPublishYearFrom(), 1, 1)));
+            }
+            if (criteria.getPublishYearTo() != null) {
+                predicates.add(builder.lessThanOrEqualTo(root.get("publishDate"), LocalDate.of(criteria.getPublishYearTo(), 12, 31)));
+            }
+            if (criteria.isAvailableOnly()) {
+                predicates.add(builder.greaterThan(root.get("availableQuantity"), 0));
+            }
+            if (StringUtils.hasText(criteria.getLocation())) {
+                predicates.add(builder.equal(root.get("location"), criteria.getLocation().trim()));
+            }
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private Predicate textPredicate(jakarta.persistence.criteria.CriteriaBuilder builder,
+                                    jakarta.persistence.criteria.Expression<String> field,
+                                    String value,
+                                    String matchMode) {
+        String cleaned = clean(value);
+        if ("exact".equals(matchMode)) {
+            return builder.equal(field, cleaned);
+        }
+        return builder.like(field, contains(cleaned));
+    }
+
+    private String clean(String value) {
+        return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String contains(String value) {
+        return "%" + value + "%";
+    }
+
+    private Set<String> variants(String keyword) {
+        Set<String> values = new LinkedHashSet<>();
+        values.add(keyword);
+        values.add(keyword.replace('亞', '亚').replace('臺', '台').replace('圖', '图').replace('書', '书'));
+        values.add(keyword.replace('亚', '亞').replace('台', '臺').replace('图', '圖').replace('书', '書'));
+        return values;
+    }
+
+    private List<Long> categoryIdsByInitials(String keyword) {
+        if (!keyword.matches("[a-z0-9]+")) {
+            return List.of();
+        }
+        return categoryRepository.findByDeletedFalseOrderByNameAsc().stream()
+                .filter(category -> initials(category.getName()).contains(keyword))
+                .map(BookCategory::getId)
+                .toList();
+    }
+
+    private String initials(String value) {
+        StringBuilder result = new StringBuilder();
+        for (char ch : value.toCharArray()) {
+            if (ch == '计') {
+                result.append('j');
+            } else if (ch == '算') {
+                result.append('s');
+            } else if (ch == '机') {
+                result.append('j');
+            } else if (ch == '文') {
+                result.append('w');
+            } else if (ch == '学') {
+                result.append('x');
+            } else if (ch == '历') {
+                result.append('l');
+            } else if (ch == '史') {
+                result.append('s');
+            } else if (Character.isLetterOrDigit(ch)) {
+                result.append(Character.toLowerCase(ch));
+            }
+        }
+        return result.toString();
     }
 
     @Transactional
