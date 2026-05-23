@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>用户表单 - 图书管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <div th:replace="~{fragments/nav :: sidebar}"></div>
+    <main class="content">
+        <div class="topbar">
+            <h1 class="page-title" th:text="${user.id == null ? '新增用户' : '编辑用户'}">用户表单</h1>
+            <a class="layui-btn layui-btn-primary" th:href="@{/users}">返回</a>
+        </div>
+        <section class="panel">
+            <form class="layui-form" th:action="@{/users}" th:object="${user}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <input type="hidden" th:field="*{id}">
+                <div class="form-grid">
+                    <div><label>账号</label><input class="layui-input" th:field="*{username}" required></div>
+                    <div><label>邮箱</label><input class="layui-input" type="email" th:field="*{email}" required></div>
+                    <div><label>昵称</label><input class="layui-input" th:field="*{nickname}" required></div>
+                    <div><label>联系电话</label><input class="layui-input" th:field="*{phone}"></div>
+                    <div><label>密码</label><input class="layui-input" type="password" name="rawPassword" placeholder="编辑时留空则不修改"></div>
+                    <div>
+                        <label>角色</label>
+                        <select th:field="*{role}">
+                            <option th:each="role : ${roles}" th:value="${role}" th:text="${role.label}"></option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>状态</label>
+                        <select th:field="*{status}">
+                            <option th:each="status : ${accountStatuses}" th:value="${status}" th:text="${status.label}"></option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top: 18px;">
+                    <button class="layui-btn" type="submit">保存</button>
+                </div>
+            </form>
+        </section>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
+</body>
+</html>

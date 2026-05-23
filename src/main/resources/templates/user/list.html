@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>用户管理 - 图书管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <div th:replace="~{fragments/nav :: sidebar}"></div>
+    <main class="content">
+        <div class="topbar">
+            <h1 class="page-title">用户管理</h1>
+            <a class="layui-btn" th:href="@{/users/new}">新增用户</a>
+        </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
+        <section class="panel">
+            <table class="layui-table">
+                <thead><tr><th>账号</th><th>邮箱</th><th>昵称</th><th>角色</th><th>状态</th><th>最后登录</th><th>操作</th></tr></thead>
+                <tbody>
+                <tr th:each="user : ${users.content}">
+                    <td th:text="${user.username}"></td>
+                    <td th:text="${user.email}"></td>
+                    <td th:text="${user.nickname}"></td>
+                    <td th:text="${user.role.label}"></td>
+                    <td th:text="${user.status.label}"></td>
+                    <td th:text="${user.lastLoginTime == null ? '-' : #temporals.format(user.lastLoginTime, 'yyyy-MM-dd HH:mm')}"></td>
+                    <td><a class="layui-btn layui-btn-xs" th:href="@{/users/{id}/edit(id=${user.id})}">编辑</a></td>
+                </tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
+</body>
+</html>

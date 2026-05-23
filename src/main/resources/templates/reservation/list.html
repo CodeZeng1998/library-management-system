@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>预约管理 - 图书管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <div th:replace="~{fragments/nav :: sidebar}"></div>
+    <main class="content">
+        <div class="topbar">
+            <h1 class="page-title">预约管理</h1>
+        </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
+        <section class="panel">
+            <form class="layui-form form-grid" th:action="@{/reservations}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <div>
+                    <label>图书</label>
+                    <select name="bookId" lay-search required>
+                        <option th:each="book : ${books}" th:value="${book.id}" th:text="${book.title + ' / 可借 ' + book.availableQuantity}"></option>
+                    </select>
+                </div>
+                <div>
+                    <label>读者</label>
+                    <select name="readerId" lay-search required>
+                        <option th:each="reader : ${readers}" th:value="${reader.id}" th:text="${reader.readerNo + ' / ' + reader.name}"></option>
+                    </select>
+                </div>
+                <div class="form-full"><button class="layui-btn" type="submit">创建预约</button></div>
+            </form>
+        </section>
+        <section class="panel" style="margin-top: 18px;">
+            <table class="layui-table">
+                <thead><tr><th>图书</th><th>读者</th><th>预约时间</th><th>保留至</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody>
+                <tr th:each="reservation : ${reservations.content}">
+                    <td th:text="${reservation.book.title}"></td>
+                    <td th:text="${reservation.reader.readerNo + ' ' + reservation.reader.name}"></td>
+                    <td th:text="${#temporals.format(reservation.reservedAt, 'yyyy-MM-dd HH:mm')}"></td>
+                    <td th:text="${#temporals.format(reservation.expiresAt, 'yyyy-MM-dd HH:mm')}"></td>
+                    <td th:text="${reservation.status.label}"></td>
+                    <td>
+                        <form th:if="${reservation.status.name() == 'WAITING'}" th:action="@{/reservations/{id}/cancel(id=${reservation.id})}" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs layui-btn-danger" type="submit">取消</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
+</body>
+</html>

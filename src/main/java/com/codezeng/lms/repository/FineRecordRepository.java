@@ -1,0 +1,15 @@
+package com.codezeng.lms.repository;
+
+import com.codezeng.lms.domain.FineRecord;
+import com.codezeng.lms.domain.Reader;
+import com.codezeng.lms.domain.enums.FineStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface FineRecordRepository extends JpaRepository<FineRecord, Long> {
+
+    boolean existsByReaderAndStatus(Reader reader, FineStatus status);
+
+    Page<FineRecord> findByDeletedFalse(Pageable pageable);
+}

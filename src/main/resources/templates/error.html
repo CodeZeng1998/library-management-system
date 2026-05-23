@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>错误 - 图书管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <div th:replace="~{fragments/nav :: sidebar}"></div>
+    <main class="content">
+        <section class="panel">
+            <h1 class="page-title">请求处理失败</h1>
+            <p style="margin-top: 12px;" th:text="${errorMessage}">未知错误</p>
+            <a class="layui-btn" th:href="@{/}">返回首页</a>
+        </section>
+    </main>
+</div>
+</body>
+</html>

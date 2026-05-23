@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security">
+<body>
+<aside class="sidebar" th:fragment="sidebar">
+    <div class="brand">图书管理系统</div>
+    <a class="nav-link" th:href="@{/}">数据看板</a>
+    <a class="nav-link" th:href="@{/books}" sec:authorize="hasAnyRole('SUPER_ADMIN','LIBRARIAN')">图书管理</a>
+    <a class="nav-link" th:href="@{/readers}" sec:authorize="hasAnyRole('SUPER_ADMIN','LIBRARIAN')">读者管理</a>
+    <a class="nav-link" th:href="@{/borrow}" sec:authorize="hasAnyRole('SUPER_ADMIN','LIBRARIAN')">借阅管理</a>
+    <a class="nav-link" th:href="@{/reservations}" sec:authorize="hasAnyRole('SUPER_ADMIN','LIBRARIAN')">预约管理</a>
+    <a class="nav-link" th:href="@{/fines}" sec:authorize="hasAnyRole('SUPER_ADMIN','LIBRARIAN')">罚款管理</a>
+    <a class="nav-link" th:href="@{/users}" sec:authorize="hasRole('SUPER_ADMIN')">用户管理</a>
+    <a class="nav-link" th:href="@{/system/configs}" sec:authorize="hasRole('SUPER_ADMIN')">系统配置</a>
+    <a class="nav-link" th:href="@{/system/logs}" sec:authorize="hasRole('SUPER_ADMIN')">操作日志</a>
+</aside>
+</body>
+</html>

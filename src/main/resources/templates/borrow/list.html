@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>借阅管理 - 图书管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <div th:replace="~{fragments/nav :: sidebar}"></div>
+    <main class="content">
+        <div class="topbar">
+            <h1 class="page-title">借阅管理</h1>
+            <div class="table-actions">
+                <form th:action="@{/borrow/overdue-scan}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                    <button class="layui-btn layui-btn-primary" type="submit">逾期扫描</button>
+                </form>
+                <a class="layui-btn" th:href="@{/borrow/new}">办理借书</a>
+            </div>
+        </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
+        <section class="panel">
+            <table class="layui-table">
+                <thead><tr><th>图书</th><th>读者</th><th>借出日期</th><th>应还日期</th><th>归还日期</th><th>状态</th><th>罚款</th><th>操作</th></tr></thead>
+                <tbody>
+                <tr th:each="record : ${records.content}">
+                    <td th:text="${record.book.title}"></td>
+                    <td th:text="${record.reader.readerNo + ' ' + record.reader.name}"></td>
+                    <td th:text="${record.borrowDate}"></td>
+                    <td th:text="${record.dueDate}"></td>
+                    <td th:text="${record.returnDate ?: '-'}"></td>
+                    <td th:text="${record.status.label}"></td>
+                    <td th:text="${record.fineAmount}"></td>
+                    <td class="table-actions">
+                        <form th:if="${record.status.name() == 'BORROWED'}" th:action="@{/borrow/{id}/renew(id=${record.id})}" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs" type="submit">续借</button>
+                        </form>
+                        <form th:if="${record.status.name() == 'BORROWED' || record.status.name() == 'OVERDUE'}" th:action="@{/borrow/{id}/return(id=${record.id})}" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs layui-btn-normal" type="submit">归还</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${records.hasPrevious()}" th:href="@{/borrow(page=${records.number - 1})}">上一页</a>
+                <span th:text="|${records.number + 1} / ${records.totalPages == 0 ? 1 : records.totalPages}|"></span>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${records.hasNext()}" th:href="@{/borrow(page=${records.number + 1})}">下一页</a>
+            </div>
+        </section>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
+</body>
+</html>
