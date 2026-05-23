@@ -13,7 +13,10 @@
     <main class="content">
         <div class="topbar">
             <h1 class="page-title">读者管理</h1>
-            <a class="layui-btn" th:href="@{/readers/new}">新增读者</a>
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-primary" th:href="@{/readers/export}">导出CSV</a>
+                <a class="layui-btn" th:href="@{/readers/new}">新增读者</a>
+            </div>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
         <section class="panel">
@@ -21,7 +24,13 @@
                 <input class="layui-input" style="max-width: 360px;" name="keyword" th:value="${keyword}" placeholder="姓名 / 编号 / 电话">
                 <button class="layui-btn layui-btn-primary" type="submit">搜索</button>
             </form>
-            <table class="layui-table">
+            <form class="import-bar" th:action="@{/readers/import}" method="post" enctype="multipart/form-data">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <input class="layui-input" type="file" name="file" accept=".csv" required>
+                <button class="layui-btn" type="submit">批量导入</button>
+                <span class="hint">CSV列：读者编号,姓名,性别,电话,邮箱,证件号,类型,等级,状态,押金</span>
+            </form>
+            <table class="layui-table responsive-table">
                 <thead><tr><th>编号</th><th>姓名</th><th>电话</th><th>邮箱</th><th>类型</th><th>等级</th><th>状态</th><th>操作</th></tr></thead>
                 <tbody>
                 <tr th:each="reader : ${readers.content}">

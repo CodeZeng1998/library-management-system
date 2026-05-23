@@ -13,7 +13,10 @@
     <main class="content">
         <div class="topbar">
             <h1 class="page-title">图书管理</h1>
-            <a class="layui-btn" th:href="@{/books/new}">新增图书</a>
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-primary" th:href="@{/books/export}">导出CSV</a>
+                <a class="layui-btn" th:href="@{/books/new}">新增图书</a>
+            </div>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
         <section class="panel">
@@ -21,7 +24,13 @@
                 <input class="layui-input" style="max-width: 360px;" name="keyword" th:value="${keyword}" placeholder="书名 / 作者 / ISBN">
                 <button class="layui-btn layui-btn-primary" type="submit">搜索</button>
             </form>
-            <table class="layui-table">
+            <form class="import-bar" th:action="@{/books/import}" method="post" enctype="multipart/form-data">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <input class="layui-input" type="file" name="file" accept=".csv" required>
+                <button class="layui-btn" type="submit">批量导入</button>
+                <span class="hint">CSV列：ISBN,书名,作者,出版社,分类,总库存,可借库存,位置,价格</span>
+            </form>
+            <table class="layui-table responsive-table">
                 <thead><tr><th>书名</th><th>ISBN</th><th>作者</th><th>分类</th><th>库存</th><th>位置</th><th>操作</th></tr></thead>
                 <tbody>
                 <tr th:each="book : ${books.content}">

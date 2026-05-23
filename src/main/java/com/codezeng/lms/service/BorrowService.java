@@ -29,25 +29,28 @@ public class BorrowService {
     private final BorrowRecordRepository borrowRecordRepository;
     private final FineRecordRepository fineRecordRepository;
     private final OperationLogService operationLogService;
+    private final ReservationService reservationService;
 
     public BorrowService(
             BookRepository bookRepository,
             ReaderRepository readerRepository,
             BorrowRecordRepository borrowRecordRepository,
             FineRecordRepository fineRecordRepository,
-            OperationLogService operationLogService) {
+            OperationLogService operationLogService,
+            ReservationService reservationService) {
         this.bookRepository = bookRepository;
         this.readerRepository = readerRepository;
         this.borrowRecordRepository = borrowRecordRepository;
         this.fineRecordRepository = fineRecordRepository;
         this.operationLogService = operationLogService;
+        this.reservationService = reservationService;
     }
 
     @Transactional
     public BorrowRecord borrowBook(Long bookId, Long readerId) {
         Book book = bookRepository.findById(bookId).orElseThrow();
         Reader reader = readerRepository.findById(readerId).orElseThrow();
-        validateBorrow(book, reader);
+        boolean useLockedReservation = validateBorrow(book, reader);
 
         BorrowRecord record = new BorrowRecord();
         record.setBook(book);
@@ -56,7 +59,11 @@ public class BorrowService {
         record.setDueDate(LocalDate.now().plusDays(reader.getMemberLevel().getBorrowDays()));
         record.setStatus(BorrowStatus.BORROWED);
 
-        book.setAvailableQuantity(book.getAvailableQuantity() - 1);
+        if (useLockedReservation) {
+            reservationService.completeIfNotified(book, reader);
+        } else {
+            book.setAvailableQuantity(book.getAvailableQuantity() - 1);
+        }
         book.setBorrowCount(book.getBorrowCount() + 1);
         bookRepository.save(book);
 
@@ -84,6 +91,7 @@ public class BorrowService {
         } else {
             record.setStatus(BorrowStatus.RETURNED);
             record.getBook().setAvailableQuantity(record.getBook().getAvailableQuantity() + 1);
+            reservationService.lockNextReservation(record.getBook());
         }
         record.setFineAmount(fineAmount);
 
@@ -132,15 +140,12 @@ public class BorrowService {
         borrowRecordRepository.saveAll(records);
     }
 
-    private void validateBorrow(Book book, Reader reader) {
+    private boolean validateBorrow(Book book, Reader reader) {
         if (book.isDeleted() || reader.isDeleted()) {
             throw new IllegalStateException("图书或读者不存在");
         }
         if (book.isReferenceOnly()) {
             throw new IllegalStateException("该图书仅限馆内阅读");
-        }
-        if (book.getAvailableQuantity() <= 0) {
-            throw new IllegalStateException("库存不足，请先预约");
         }
         if (reader.getStatus() != AccountStatus.NORMAL) {
             throw new IllegalStateException("读者账号状态不允许借阅");
@@ -156,6 +161,11 @@ public class BorrowService {
         if (fineRecordRepository.existsByReaderAndStatus(reader, FineStatus.UNPAID)) {
             throw new IllegalStateException("存在未缴纳罚款");
         }
+        boolean hasLockedReservation = reservationService.hasActiveNotifiedReservation(book, reader);
+        if (book.getAvailableQuantity() <= 0 && !hasLockedReservation) {
+            throw new IllegalStateException("库存不足，请先预约");
+        }
+        return hasLockedReservation;
     }
 
     private BigDecimal calculateOverdueFine(BorrowRecord record) {

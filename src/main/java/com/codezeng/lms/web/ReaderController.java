@@ -5,9 +5,13 @@ import com.codezeng.lms.domain.enums.AccountStatus;
 import com.codezeng.lms.domain.enums.MemberLevel;
 import com.codezeng.lms.domain.enums.ReaderType;
 import com.codezeng.lms.repository.ReaderRepository;
+import com.codezeng.lms.service.ImportResult;
 import com.codezeng.lms.service.ReaderService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +20,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 @Controller
 @RequestMapping("/readers")
@@ -63,6 +71,25 @@ public class ReaderController {
         readerService.softDelete(id);
         redirectAttributes.addFlashAttribute("message", "读者已删除");
         return "redirect:/readers";
+    }
+
+    @PostMapping("/import")
+    public String importCsv(@RequestParam MultipartFile file, RedirectAttributes redirectAttributes) {
+        try {
+            ImportResult result = readerService.importCsv(file);
+            redirectAttributes.addFlashAttribute(result.getFailureCount() == 0 ? "message" : "error", result.toMessage());
+        } catch (IOException ex) {
+            redirectAttributes.addFlashAttribute("error", "导入失败：" + ex.getMessage());
+        }
+        return "redirect:/readers";
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportCsv() {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=readers.csv")
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .body(readerService.exportCsv().getBytes(StandardCharsets.UTF_8));
     }
 
     private void addFormData(Model model, Reader reader) {

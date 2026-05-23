@@ -22,4 +22,8 @@ public interface BorrowRecordRepository extends JpaRepository<BorrowRecord, Long
     Page<BorrowRecord> findByDeletedFalse(Pageable pageable);
 
     List<BorrowRecord> findByStatusAndDueDateBefore(BorrowStatus status, LocalDate date);
+
+    List<BorrowRecord> findByStatusAndDueDate(BorrowStatus status, LocalDate date);
+
+    List<BorrowRecord> findByStatus(BorrowStatus status);
 }
