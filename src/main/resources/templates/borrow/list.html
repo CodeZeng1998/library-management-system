@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <title>借阅管理 - 图书管理系统</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
@@ -10,7 +12,7 @@
 <body>
 <div class="app-shell">
     <div th:replace="~{fragments/nav :: sidebar}"></div>
-    <main class="content">
+    <main class="content borrow-workspace">
         <div class="topbar">
             <h1 class="page-title">借阅管理</h1>
             <div class="table-actions">
@@ -18,31 +20,128 @@
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                     <button class="layui-btn layui-btn-primary" type="submit">逾期扫描</button>
                 </form>
-                <a class="layui-btn" th:href="@{/borrow/new}">办理借书</a>
             </div>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
+
+        <section class="borrow-command-bar" id="borrowCommandBar" aria-label="借还书快捷操作">
+            <button class="command-button active" type="button" data-command="borrow">
+                <span>扫码借书</span><kbd>F2</kbd>
+            </button>
+            <button class="command-button" type="button" data-command="return">
+                <span>扫码还书</span><kbd>F3</kbd>
+            </button>
+            <button class="command-button" type="button" data-command="renew">
+                <span>快速续借</span><kbd>F4</kbd>
+            </button>
+            <span class="command-status" id="borrowCommandStatus">准备就绪</span>
+        </section>
+
+        <section class="scan-desk" id="scanDesk">
+            <article class="panel scan-panel" data-panel="borrow">
+                <div class="panel-heading">
+                    <h2>扫码借书</h2>
+                    <span class="status-pill" id="borrowFlowState">等待读者</span>
+                </div>
+                <div class="scan-fields two-columns">
+                    <label class="scan-field">
+                        <span>读者证号</span>
+                        <input class="layui-input scan-input" id="borrowReaderNo" autocomplete="off" placeholder="扫描或输入读者证号">
+                    </label>
+                    <label class="scan-field">
+                        <span>图书 ISBN</span>
+                        <input class="layui-input scan-input" id="borrowBookIsbn" autocomplete="off" placeholder="扫描图书 ISBN" disabled>
+                    </label>
+                </div>
+                <div class="scan-status-grid">
+                    <div class="scan-status empty" id="readerStatus">等待读者扫描</div>
+                    <div class="scan-status empty" id="bookStatus">等待图书扫描</div>
+                </div>
+                <div class="desk-actions">
+                    <button class="layui-btn" type="button" id="borrowSubmit" disabled>借出</button>
+                    <button class="layui-btn layui-btn-primary" type="button" id="borrowReset">清空</button>
+                </div>
+            </article>
+
+            <article class="panel scan-panel" data-panel="return">
+                <div class="panel-heading">
+                    <h2>扫码还书</h2>
+                    <span class="status-pill" id="returnModeBadge">正常归还</span>
+                </div>
+                <label class="scan-field">
+                    <span>图书 ISBN</span>
+                    <input class="layui-input scan-input" id="returnBookIsbn" autocomplete="off" placeholder="连续扫描待还图书">
+                </label>
+                <div class="queue-list" id="returnQueue">
+                    <div class="queue-empty">待还队列为空</div>
+                </div>
+                <div class="queue-summary" id="returnSummary">待还 0 本，预计罚款 0.00</div>
+                <div class="desk-actions">
+                    <button class="layui-btn layui-btn-normal" type="button" id="returnBatch" disabled>批量归还</button>
+                    <button class="layui-btn layui-btn-primary" type="button" id="returnClear">清空队列</button>
+                </div>
+                <div class="shortcut-line">Alt+D 标记损坏，Alt+L 标记丢失</div>
+            </article>
+
+            <article class="panel scan-panel" data-panel="renew">
+                <div class="panel-heading">
+                    <h2>快速续借</h2>
+                    <span class="status-pill">扫描即续借</span>
+                </div>
+                <label class="scan-field">
+                    <span>图书 ISBN</span>
+                    <input class="layui-input scan-input" id="renewBookIsbn" autocomplete="off" placeholder="扫描图书 ISBN">
+                </label>
+                <div class="scan-status empty" id="renewStatus">等待续借图书扫描</div>
+                <div class="desk-actions">
+                    <button class="layui-btn" type="button" id="renewSubmit">续借</button>
+                </div>
+            </article>
+        </section>
+
+        <div class="borrow-toast" id="borrowToast" aria-live="polite"></div>
+
         <section class="panel">
-            <table class="layui-table">
-                <thead><tr><th>图书</th><th>读者</th><th>借出日期</th><th>应还日期</th><th>归还日期</th><th>状态</th><th>罚款</th><th>操作</th></tr></thead>
-                <tbody>
-                <tr th:each="record : ${records.content}">
-                    <td th:text="${record.book.title}"></td>
-                    <td th:text="${record.reader.readerNo + ' ' + record.reader.name}"></td>
-                    <td th:text="${record.borrowDate}"></td>
-                    <td th:text="${record.dueDate}"></td>
-                    <td th:text="${record.returnDate ?: '-'}"></td>
-                    <td th:text="${record.status.label}"></td>
-                    <td th:text="${record.fineAmount}"></td>
-                    <td class="table-actions">
-                        <form th:if="${record.status.name() == 'BORROWED'}" th:action="@{/borrow/{id}/renew(id=${record.id})}" method="post">
-                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                            <button class="layui-btn layui-btn-xs" type="submit">续借</button>
-                        </form>
-                        <form th:if="${record.status.name() == 'BORROWED' || record.status.name() == 'OVERDUE'}" th:action="@{/borrow/{id}/return(id=${record.id})}" method="post">
-                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                            <button class="layui-btn layui-btn-xs layui-btn-normal" type="submit">归还</button>
-                        </form>
+            <div class="table-toolbar">
+                <h2 class="section-title">借阅记录</h2>
+            </div>
+            <table class="layui-table responsive-table">
+                <thead>
+                <tr>
+                    <th>图书</th>
+                    <th>读者</th>
+                    <th>借出日期</th>
+                    <th>应还日期</th>
+                    <th>归还日期</th>
+                    <th>状态</th>
+                    <th>罚款</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody id="borrowRecordBody">
+                <tr th:each="record : ${records.content}" th:attr="data-record-id=${record.id},data-record-status=${record.status.name()}">
+                    <td data-cell="book" th:text="${record.book.title}"></td>
+                    <td data-cell="reader" th:text="${record.reader.readerNo + ' ' + record.reader.name}"></td>
+                    <td data-cell="borrowDate" th:text="${record.borrowDate}"></td>
+                    <td data-cell="dueDate" th:text="${record.dueDate}"></td>
+                    <td data-cell="returnDate" th:text="${record.returnDate ?: '-'}"></td>
+                    <td data-cell="status" th:text="${record.status.label}"></td>
+                    <td data-cell="fine" th:text="${record.fineAmount}"></td>
+                    <td class="table-actions" data-cell="actions">
+                        <button th:if="${record.status.name() == 'BORROWED'}"
+                                class="layui-btn layui-btn-xs"
+                                type="button"
+                                data-row-action="renew"
+                                th:attr="data-record-id=${record.id}">
+                            续借
+                        </button>
+                        <button th:if="${record.status.name() == 'BORROWED' || record.status.name() == 'OVERDUE'}"
+                                class="layui-btn layui-btn-xs layui-btn-normal"
+                                type="button"
+                                data-row-action="return"
+                                th:attr="data-record-id=${record.id}">
+                            归还
+                        </button>
                     </td>
                 </tr>
                 </tbody>
@@ -56,5 +155,6 @@
     </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
+<script th:src="@{/js/borrow-workbench.js}"></script>
 </body>
 </html>
