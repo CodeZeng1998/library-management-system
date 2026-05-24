@@ -29,6 +29,9 @@ public class User extends BaseEntity {
     @Column(length = 32)
     private String phone;
 
+    @Column(length = 32)
+    private String readerNo;
+
     private String avatarUrl;
 
     @Column(length = 64)
@@ -85,6 +88,14 @@ public class User extends BaseEntity {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getReaderNo() {
+        return readerNo;
+    }
+
+    public void setReaderNo(String readerNo) {
+        this.readerNo = readerNo;
     }
 
     public String getAvatarUrl() {

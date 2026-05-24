@@ -56,6 +56,7 @@ public class DataInitializer {
                                PasswordEncoder passwordEncoder) {
         return args -> {
             seedUsers(userRepository, passwordEncoder);
+            bindUserToReader(userRepository, "reader_demo", "R202605230001");
             seedBooks(categoryRepository, bookRepository, localizedTextRepository);
             seedReaders(readerRepository);
             seedBorrowRecords(bookRepository, readerRepository, borrowRecordRepository);
@@ -216,6 +217,15 @@ public class DataInitializer {
         user.setStatus(status);
         user.setLastLoginTime(LocalDateTime.now().minusDays(1));
         repository.save(user);
+    }
+
+    private void bindUserToReader(UserRepository repository, String username, String readerNo) {
+        repository.findByUsernameOrEmail(username, username).ifPresent(user -> {
+            if (user.getReaderNo() == null || user.getReaderNo().isBlank()) {
+                user.setReaderNo(readerNo);
+                repository.save(user);
+            }
+        });
     }
 
     private BookCategory createCategory(BookCategoryRepository repository, String name) {

@@ -36,8 +36,8 @@
                     <option th:each="suggestion : ${suggestions}" th:value="${suggestion}"></option>
                 </datalist>
 
-                <details class="advanced-search" th:open="${criteria.title != null || criteria.author != null || !criteria.categoryIds.isEmpty() || criteria.publishYearFrom != null || criteria.publishYearTo != null || criteria.availableOnly || criteria.location != null}">
-                    <summary th:text="#{book.advancedSearch}">高级检索</summary>
+                <section class="advanced-search" aria-labelledby="advancedSearchTitle">
+                    <h2 id="advancedSearchTitle" th:text="#{book.advancedSearch}">高级检索</h2>
                     <div class="advanced-grid">
                         <label class="condition-row">
                             <span th:text="#{book.title}">书名</span>
@@ -82,7 +82,7 @@
                             <span th:text="#{book.availableOnly}">仅显示有库存</span>
                         </label>
                     </div>
-                </details>
+                </section>
 
                 <div class="search-options">
                     <fieldset class="option-group">
@@ -95,9 +95,23 @@
                     </fieldset>
                     <fieldset class="option-group">
                         <legend th:text="#{search.view}">视图</legend>
-                        <label><input type="radio" name="view" value="card" th:checked="${criteria.view == 'card'}"> <span th:text="#{search.view.card}">卡片</span></label>
-                        <label><input type="radio" name="view" value="list" th:checked="${criteria.view == 'list'}"> <span th:text="#{search.view.list}">列表</span></label>
-                        <label><input type="radio" name="view" value="detail" th:checked="${criteria.view == 'detail'}"> <span th:text="#{search.view.detail}">详细</span></label>
+                        <div class="view-toggle" role="group" th:attr="aria-label=#{search.view}">
+                            <label th:title="#{search.view.card}">
+                                <input type="radio" name="view" value="card" th:checked="${criteria.view == 'card'}">
+                                <span aria-hidden="true">▦</span>
+                                <em th:text="#{search.view.card}">卡片</em>
+                            </label>
+                            <label th:title="#{search.view.list}">
+                                <input type="radio" name="view" value="list" th:checked="${criteria.view == 'list'}">
+                                <span aria-hidden="true">☰</span>
+                                <em th:text="#{search.view.list}">列表</em>
+                            </label>
+                            <label th:title="#{search.view.detail}">
+                                <input type="radio" name="view" value="detail" th:checked="${criteria.view == 'detail'}">
+                                <span aria-hidden="true">▤</span>
+                                <em th:text="#{search.view.detail}">详细</em>
+                            </label>
+                        </div>
                     </fieldset>
                     <button class="layui-btn layui-btn-primary" type="button" id="saveBookSearch" th:text="#{search.saveFavorite}">保存为常用检索</button>
                 </div>
@@ -105,11 +119,17 @@
 
             <div class="saved-searches">
                 <div>
-                    <strong th:text="#{search.history}">检索历史</strong>
+                    <div class="saved-search-heading">
+                        <strong th:text="#{search.history}">检索历史</strong>
+                        <button class="text-button" type="button" id="clearBookSearchHistory" th:text="#{search.clearHistory}">清空历史</button>
+                    </div>
                     <div class="search-chip-row" id="bookSearchHistory"></div>
                 </div>
                 <div>
-                    <strong th:text="#{search.favorite}">常用检索</strong>
+                    <div class="saved-search-heading">
+                        <strong th:text="#{search.favorite}">常用检索</strong>
+                        <button class="text-button" type="button" id="clearBookSearchFavorites" th:text="#{search.manageFavorites}">管理收藏</button>
+                    </div>
                     <div class="search-chip-row" id="bookSearchFavorites"></div>
                 </div>
             </div>

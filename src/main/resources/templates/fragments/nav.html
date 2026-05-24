@@ -3,31 +3,40 @@
 <body>
 <aside class="sidebar" th:fragment="sidebar">
     <div class="brand" th:text="#{app.name}">Library Management System</div>
-    <div class="theme-panel">
-        <label class="theme-label" for="themeMode" th:text="#{theme.label}">Theme</label>
-        <select id="themeMode" class="theme-switcher" aria-label="Theme mode">
-            <option value="auto" th:text="#{theme.auto}">Auto</option>
-            <option value="light" th:text="#{theme.light}">Light</option>
-            <option value="dark" th:text="#{theme.dark}">Dark</option>
-            <option value="eye" th:text="#{theme.eye}">Eye Comfort</option>
-        </select>
-    </div>
-    <div class="theme-panel">
-        <label class="theme-label" for="localeMode" th:text="#{language.label}">Language</label>
-        <select id="localeMode" class="theme-switcher" aria-label="Language" th:data-current-locale="${#locale.toString()}">
-            <option value="zh_CN" th:text="#{language.zh_CN}">Simplified Chinese</option>
-            <option value="zh_TW" th:text="#{language.zh_TW}">Traditional Chinese</option>
-            <option value="en" th:text="#{language.en}">English</option>
-        </select>
-    </div>
-    <div class="theme-panel">
-        <label class="theme-label" for="densityMode" th:text="#{density.label}">Density</label>
-        <select id="densityMode" class="theme-switcher" aria-label="Information density">
-            <option value="compact" th:text="#{density.compact}">Compact</option>
-            <option value="comfortable" th:text="#{density.comfortable}">Comfortable</option>
-        </select>
-    </div>
+    <details class="sidebar-settings">
+        <summary class="settings-button">
+            <span class="settings-icon" aria-hidden="true">&#9881;</span>
+            <span th:text="#{settings.label}">Settings</span>
+        </summary>
+        <div class="settings-menu">
+            <div class="theme-panel">
+                <label class="theme-label" for="themeMode" th:text="#{theme.label}">Theme</label>
+                <select id="themeMode" class="theme-switcher" aria-label="Theme mode">
+                    <option value="auto" th:text="#{theme.auto}">Auto</option>
+                    <option value="light" th:text="#{theme.light}">Light</option>
+                    <option value="dark" th:text="#{theme.dark}">Dark</option>
+                    <option value="eye" th:text="#{theme.eye}">Eye Comfort</option>
+                </select>
+            </div>
+            <div class="theme-panel">
+                <label class="theme-label" for="localeMode" th:text="#{language.label}">Language</label>
+                <select id="localeMode" class="theme-switcher" aria-label="Language" th:data-current-locale="${#locale.toString()}">
+                    <option value="zh_CN" th:text="#{language.zh_CN}">Simplified Chinese</option>
+                    <option value="zh_TW" th:text="#{language.zh_TW}">Traditional Chinese</option>
+                    <option value="en" th:text="#{language.en}">English</option>
+                </select>
+            </div>
+            <div class="theme-panel">
+                <label class="theme-label" for="densityMode" th:text="#{density.label}">Density</label>
+                <select id="densityMode" class="theme-switcher" aria-label="Information density">
+                    <option value="compact" th:text="#{density.compact}">Compact</option>
+                    <option value="comfortable" th:text="#{density.comfortable}">Comfortable</option>
+                </select>
+            </div>
+        </div>
+    </details>
     <a class="nav-link" th:href="@{/}" sec:authorize="hasAuthority('DASHBOARD_VIEW')" th:text="#{nav.dashboard}">Dashboard</a>
+    <a class="nav-link" th:href="@{/portal}" sec:authorize="hasAuthority('ROLE_READER')" th:text="#{nav.portal}">Reader Portal</a>
     <a class="nav-link" th:href="@{/recommendations}" sec:authorize="hasAuthority('RECOMMENDATION_VIEW')" th:text="#{nav.recommendations}">Recommendations</a>
     <a class="nav-link" th:href="@{/books}" sec:authorize="hasAuthority('BOOK_VIEW')" th:text="#{nav.books}">Books</a>
     <a class="nav-link" th:href="@{/readers}" sec:authorize="hasAuthority('READER_VIEW')" th:text="#{nav.readers}">Readers</a>

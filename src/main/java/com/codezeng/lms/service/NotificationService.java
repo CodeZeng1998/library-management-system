@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 
 @Service
 public class NotificationService {
@@ -41,5 +43,27 @@ public class NotificationService {
         notification.setStatus(NotificationStatus.READ);
         notification.setReadAt(LocalDateTime.now());
         notificationRepository.save(notification);
+    }
+
+    @Transactional
+    public int markRead(Collection<Long> ids) {
+        List<Notification> notifications = notificationRepository.findByIdInAndDeletedFalse(ids);
+        LocalDateTime now = LocalDateTime.now();
+        notifications.stream()
+                .filter(notification -> notification.getStatus() == NotificationStatus.UNREAD)
+                .forEach(notification -> {
+                    notification.setStatus(NotificationStatus.READ);
+                    notification.setReadAt(now);
+                });
+        notificationRepository.saveAll(notifications);
+        return notifications.size();
+    }
+
+    @Transactional
+    public int softDelete(Collection<Long> ids) {
+        List<Notification> notifications = notificationRepository.findByIdInAndDeletedFalse(ids);
+        notifications.forEach(notification -> notification.setDeleted(true));
+        notificationRepository.saveAll(notifications);
+        return notifications.size();
     }
 }

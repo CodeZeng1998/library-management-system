@@ -11,6 +11,8 @@ public interface ReaderRepository extends JpaRepository<Reader, Long> {
 
     Optional<Reader> findByReaderNoAndDeletedFalse(String readerNo);
 
+    Optional<Reader> findByEmailAndDeletedFalse(String email);
+
     boolean existsByEmailAndDeletedFalse(String email);
 
     boolean existsByIdentityNoAndDeletedFalse(String identityNo);

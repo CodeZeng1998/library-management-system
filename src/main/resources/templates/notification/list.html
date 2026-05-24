@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="|#{notification.title} - #{app.name}|">消息中心 - 图书管理系统</title>
+    <title th:text="|#{notification.title} - #{app.name}|">Messages - Library Management System</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -12,37 +12,74 @@
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
         <div class="topbar">
-            <h1 class="page-title" th:text="#{notification.title}">消息中心</h1>
+            <div>
+                <h1 class="page-title" th:text="#{notification.title}">Messages</h1>
+                <p class="portal-subtitle" th:text="#{notification.unreadCount(${unreadCount})}">Unread messages</p>
+            </div>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
-        <section class="panel">
-            <table class="layui-table responsive-table">
-                <thead><tr><th th:text="#{borrow.reader}">读者</th><th th:text="#{common.title}">标题</th><th th:text="#{common.content}">内容</th><th th:text="#{common.channel}">渠道</th><th th:text="#{common.status}">状态</th><th th:text="#{notification.sentAt}">发送时间</th><th th:text="#{common.operation}">操作</th></tr></thead>
-                <tbody>
-                <tr th:each="notification : ${notifications.content}">
-                    <td th:text="${notification.reader.readerNo + ' ' + notification.reader.name}"></td>
-                    <td th:text="${notification.title}"></td>
-                    <td th:text="${notification.content}"></td>
-                    <td th:text="${#messages.msg('notificationChannel.' + notification.channel.name())}"></td>
-                    <td th:text="${#messages.msg('notificationStatus.' + notification.status.name())}"></td>
-                    <td th:text="${#temporals.format(notification.sentAt, 'yyyy-MM-dd HH:mm')}"></td>
-                    <td>
-                        <form th:if="${notification.status.name() == 'UNREAD'}" th:action="@{/notifications/{id}/read(id=${notification.id})}" method="post">
-                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                            <button class="layui-btn layui-btn-xs" type="submit" th:text="#{common.markRead}">标为已读</button>
-                        </form>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+
+        <section class="panel notification-center">
+            <div class="notification-tabs" role="tablist" th:attr="aria-label=#{notification.filter}">
+                <a th:classappend="${status == null ? 'active' : ''}" th:href="@{/notifications}" th:text="#{common.all}">All</a>
+                <a th:classappend="${status != null and status.name() == 'UNREAD' ? 'active' : ''}" th:href="@{/notifications(status='UNREAD')}" th:text="#{notificationStatus.UNREAD}">Unread</a>
+                <a th:classappend="${status != null and status.name() == 'READ' ? 'active' : ''}" th:href="@{/notifications(status='READ')}" th:text="#{notificationStatus.READ}">Read</a>
+            </div>
+
+            <form id="notificationBatchForm" th:action="@{/notifications/batch}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            </form>
+            <div class="notification-actions">
+                <label class="select-all">
+                    <input type="checkbox" id="selectAllNotifications">
+                    <span th:text="#{notification.selectAll}">Select all</span>
+                </label>
+                <button class="layui-btn layui-btn-sm layui-btn-primary" form="notificationBatchForm" type="submit" name="action" value="read" th:text="#{notification.batchRead}">Mark read</button>
+                <button class="layui-btn layui-btn-sm layui-btn-danger" form="notificationBatchForm" type="submit" name="action" value="delete" th:text="#{notification.batchDelete}">Delete</button>
+            </div>
+
+            <div class="notification-list">
+                <article class="notification-card"
+                         th:each="notification : ${notifications.content}"
+                         th:classappend="${notification.status.name() == 'UNREAD' ? ' unread' : ''}">
+                    <input class="notification-check" form="notificationBatchForm" type="checkbox" name="ids" th:value="${notification.id}" th:aria-label="${notification.title}">
+                    <div class="notification-card-body">
+                        <header>
+                            <div>
+                                <strong th:text="${notification.title}">Message title</strong>
+                                <span th:text="${notification.reader.readerNo + ' ' + notification.reader.name}">Reader</span>
+                            </div>
+                            <em th:text="${#messages.msg('notificationStatus.' + notification.status.name())}">Status</em>
+                        </header>
+                        <p th:text="${notification.content}">Message content</p>
+                        <footer>
+                            <span th:text="${#messages.msg('notificationChannel.' + notification.channel.name())}">Channel</span>
+                            <span th:text="${#temporals.format(notification.sentAt, 'yyyy-MM-dd HH:mm')}">Time</span>
+                            <form th:if="${notification.status.name() == 'UNREAD'}" th:action="@{/notifications/{id}/read(id=${notification.id})}" method="post">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <button class="layui-btn layui-btn-xs" type="submit" th:text="#{common.markRead}">Mark as Read</button>
+                            </form>
+                        </footer>
+                    </div>
+                </article>
+            </div>
+
+            <div class="empty-result" th:if="${notifications.totalElements == 0}" th:text="#{notification.empty}">No messages.</div>
             <div class="table-actions">
-                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${notifications.hasPrevious()}" th:href="@{/notifications(page=${notifications.number - 1})}" th:text="#{common.previous}">上一页</a>
+                <a class="layui-btn layui-btn-sm layui-btn-primary"
+                   th:if="${notifications.hasPrevious()}"
+                   th:href="@{/notifications(page=${notifications.number - 1}, status=${status})}"
+                   th:text="#{common.previous}">Previous</a>
                 <span th:text="|${notifications.number + 1} / ${notifications.totalPages == 0 ? 1 : notifications.totalPages}|"></span>
-                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${notifications.hasNext()}" th:href="@{/notifications(page=${notifications.number + 1})}" th:text="#{common.next}">下一页</a>
+                <a class="layui-btn layui-btn-sm layui-btn-primary"
+                   th:if="${notifications.hasNext()}"
+                   th:href="@{/notifications(page=${notifications.number + 1}, status=${status})}"
+                   th:text="#{common.next}">Next</a>
             </div>
         </section>
     </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
+<script th:src="@{/js/notifications.js}"></script>
 </body>
 </html>

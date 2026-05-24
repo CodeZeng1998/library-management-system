@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -20,7 +20,7 @@
             <form th:action="@{/recommendations}" method="get">
                 <label>
                     <span th:text="#{recommendation.readerProfile}">Reader profile</span>
-                    <select name="readerId" class="layui-select">
+                    <select name="readerId" class="layui-select" th:disabled="${readerOnly}">
                         <option value="" th:text="#{recommendation.libraryWide}">Library-wide recommendations</option>
                         <option th:each="reader : ${readers}"
                                 th:value="${reader.id}"
@@ -52,37 +52,64 @@
         <section class="recommendation-grid">
             <article class="panel recommendation-panel">
                 <h2 class="section-title" th:text="#{recommendation.forReader}">For This Reader</h2>
-                <ul class="recommendation-list">
-                    <li th:each="item : ${dashboard.collaborative()}">
-                        <strong th:text="${item.book().title}">Book</strong>
-                        <span th:text="${#messages.msg(item.reason())}">Reason</span>
-                        <em th:text="#{recommendation.score(${item.score()})}">Score</em>
-                    </li>
-                </ul>
+                <div class="recommendation-card-list">
+                    <article class="recommendation-card" th:each="item : ${dashboard.collaborative()}">
+                        <div class="book-cover">
+                            <img th:if="${item.book().coverUrl != null and !#strings.isEmpty(item.book().coverUrl)}" th:src="${item.book().coverUrl}" th:alt="${item.book().title}">
+                            <span th:if="${item.book().coverUrl == null or #strings.isEmpty(item.book().coverUrl)}" th:text="${#strings.abbreviate(item.book().title, 8)}">Book</span>
+                        </div>
+                        <div class="recommendation-card-body">
+                            <h3 th:text="${item.book().title}">Book</h3>
+                            <span class="recommendation-reason" th:text="${#messages.msg(item.reason())}">Reason</span>
+                            <div class="score-meter" th:style="|--score:${item.score() > 10 ? 100 : item.score() * 10}%|">
+                                <span></span>
+                            </div>
+                            <div class="recommendation-actions">
+                                <a class="layui-btn layui-btn-xs layui-btn-primary" th:href="@{/books(keyword=${item.book().isbn})}" th:text="#{portal.viewBook}">View</a>
+                                <form sec:authorize="hasAuthority('ROLE_READER')" th:if="${item.book().availableQuantity <= 0}" th:action="@{/portal/books/{id}/reserve(id=${item.book().id})}" method="post">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                    <button class="layui-btn layui-btn-xs" type="submit" th:text="#{recommendation.reserveNow}">Reserve</button>
+                                </form>
+                            </div>
+                        </div>
+                    </article>
+                </div>
                 <div class="empty-result" th:if="${dashboard.collaborative().isEmpty()}" th:text="#{recommendation.empty.data}">No recommendation data yet.</div>
             </article>
 
             <article class="panel recommendation-panel">
                 <h2 class="section-title" th:text="#{recommendation.alsoBorrowed}">Readers Also Borrowed</h2>
-                <ul class="recommendation-list">
-                    <li th:each="item : ${dashboard.borrowedTogether()}">
-                        <strong th:text="${item.book().title}">Book</strong>
-                        <span th:text="${#messages.msg(item.reason())}">Reason</span>
-                        <em th:text="#{recommendation.sharedBorrows(${item.score()})}">Count</em>
-                    </li>
-                </ul>
+                <div class="recommendation-card-list compact">
+                    <article class="recommendation-card" th:each="item : ${dashboard.borrowedTogether()}">
+                        <div class="book-cover">
+                            <img th:if="${item.book().coverUrl != null and !#strings.isEmpty(item.book().coverUrl)}" th:src="${item.book().coverUrl}" th:alt="${item.book().title}">
+                            <span th:if="${item.book().coverUrl == null or #strings.isEmpty(item.book().coverUrl)}" th:text="${#strings.abbreviate(item.book().title, 8)}">Book</span>
+                        </div>
+                        <div class="recommendation-card-body">
+                            <h3 th:text="${item.book().title}">Book</h3>
+                            <span th:text="#{recommendation.sharedBorrows(${item.score()})}">Count</span>
+                            <a class="layui-btn layui-btn-xs layui-btn-primary" th:href="@{/books(keyword=${item.book().isbn})}" th:text="#{portal.viewBook}">View</a>
+                        </div>
+                    </article>
+                </div>
                 <div class="empty-result" th:if="${dashboard.borrowedTogether().isEmpty()}" th:text="#{recommendation.empty.seed}">Choose a seed book with borrowing history.</div>
             </article>
 
             <article class="panel recommendation-panel">
                 <h2 class="section-title" th:text="#{recommendation.newPreferred}">New In Preferred Subjects</h2>
-                <ul class="recommendation-list">
-                    <li th:each="item : ${dashboard.newArrivals()}">
-                        <strong th:text="${item.book().title}">Book</strong>
-                        <span th:text="${item.book().category != null ? @localizedTextService.categoryName(item.book().category) : #messages.msg('common.unclassified')}">Category</span>
-                        <em th:text="${item.book().createTime == null ? '-' : #temporals.format(item.book().createTime, 'yyyy-MM-dd')}">Date</em>
-                    </li>
-                </ul>
+                <div class="recommendation-card-list compact">
+                    <article class="recommendation-card" th:each="item : ${dashboard.newArrivals()}">
+                        <div class="book-cover">
+                            <img th:if="${item.book().coverUrl != null and !#strings.isEmpty(item.book().coverUrl)}" th:src="${item.book().coverUrl}" th:alt="${item.book().title}">
+                            <span th:if="${item.book().coverUrl == null or #strings.isEmpty(item.book().coverUrl)}" th:text="${#strings.abbreviate(item.book().title, 8)}">Book</span>
+                        </div>
+                        <div class="recommendation-card-body">
+                            <h3 th:text="${item.book().title}">Book</h3>
+                            <span th:text="${item.book().category != null ? @localizedTextService.categoryName(item.book().category) : #messages.msg('common.unclassified')}">Category</span>
+                            <a class="layui-btn layui-btn-xs layui-btn-primary" th:href="@{/books(keyword=${item.book().isbn})}" th:text="#{portal.viewBook}">View</a>
+                        </div>
+                    </article>
+                </div>
                 <div class="empty-result" th:if="${dashboard.newArrivals().isEmpty()}" th:text="#{recommendation.empty.newBooks}">No matching new books yet.</div>
             </article>
         </section>

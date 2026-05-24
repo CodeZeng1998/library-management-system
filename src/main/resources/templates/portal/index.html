@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|#{portal.title} - #{app.name}|">Reader Portal - Library Management System</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <div th:replace="~{fragments/nav :: sidebar}"></div>
+    <main class="content portal-page">
+        <div class="topbar">
+            <div>
+                <h1 class="page-title" th:text="#{portal.title}">Reader Portal</h1>
+                <p class="portal-subtitle" th:text="#{portal.welcome(${dashboard.reader().name}, ${dashboard.reader().readerNo})}">Welcome</p>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <span sec:authentication="name"></span>
+                <button class="layui-btn layui-btn-sm layui-btn-primary" type="submit" th:text="#{common.logout}">Log out</button>
+            </form>
+        </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
+
+        <section class="portal-metrics">
+            <article class="stat-card">
+                <div class="stat-label" th:text="#{portal.currentBorrows}">Current borrows</div>
+                <div class="stat-value" th:text="${dashboard.activeBorrows().size()}">0</div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-label" th:text="#{portal.overdueCount}">Overdue</div>
+                <div class="stat-value" th:text="${dashboard.overdueCount()}">0</div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-label" th:text="#{portal.unpaidFines}">Unpaid fines</div>
+                <div class="stat-value" th:text="${dashboard.unpaidFineAmount()}">0</div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-label" th:text="#{portal.unreadMessages}">Unread messages</div>
+                <div class="stat-value" th:text="${dashboard.unreadCount()}">0</div>
+            </article>
+        </section>
+
+        <section class="portal-grid">
+            <article class="panel portal-panel portal-panel-wide">
+                <div class="table-toolbar">
+                    <h2 class="section-title" th:text="#{portal.activeLoans}">Active Loans</h2>
+                    <a class="layui-btn layui-btn-sm layui-btn-primary" th:href="@{/books}" th:text="#{portal.findBooks}">Find books</a>
+                </div>
+                <div class="portal-card-list">
+                    <article class="loan-card" th:each="record : ${dashboard.activeBorrows()}">
+                        <div class="book-cover">
+                            <img th:if="${record.book.coverUrl != null and !#strings.isEmpty(record.book.coverUrl)}" th:src="${record.book.coverUrl}" th:alt="${record.book.title}">
+                            <span th:if="${record.book.coverUrl == null or #strings.isEmpty(record.book.coverUrl)}" th:text="${#strings.abbreviate(record.book.title, 8)}">Book</span>
+                        </div>
+                        <div class="loan-card-body">
+                            <header>
+                                <h3 th:text="${record.book.title}">Book</h3>
+                                <span class="status-pill" th:classappend="${portalService.daysUntilDue(record) < 0 ? ' lost' : portalService.daysUntilDue(record) <= 3 ? ' damaged' : ''}"
+                                      th:text="${portalService.daysUntilDue(record) < 0 ? #messages.msg('portal.daysOverdue', -portalService.daysUntilDue(record)) : #messages.msg('portal.daysRemaining', portalService.daysUntilDue(record))}">Due</span>
+                            </header>
+                            <dl class="detail-meta">
+                                <div><dt th:text="#{borrow.borrowDate}">Borrow Date</dt><dd th:text="${record.borrowDate}">Date</dd></div>
+                                <div><dt th:text="#{borrow.dueDate}">Due Date</dt><dd th:text="${record.dueDate}">Date</dd></div>
+                                <div><dt th:text="#{borrow.renew}">Renew</dt><dd th:text="${record.renewCount + '/' + record.reader.memberLevel.maxRenewCount}">0</dd></div>
+                                <div><dt th:text="#{common.status}">Status</dt><dd th:text="${#messages.msg('borrowStatus.' + record.status.name())}">Status</dd></div>
+                            </dl>
+                            <form th:if="${record.status.name() == 'BORROWED'}" th:action="@{/portal/borrows/{id}/renew(id=${record.id})}" method="post">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <button class="layui-btn layui-btn-sm" type="submit" th:text="#{portal.selfRenew}">Renew online</button>
+                            </form>
+                        </div>
+                    </article>
+                </div>
+                <div class="empty-result" th:if="${dashboard.activeBorrows().isEmpty()}" th:text="#{portal.emptyLoans}">No active loans.</div>
+            </article>
+
+            <article class="panel portal-panel">
+                <h2 class="section-title" th:text="#{portal.reservationQueue}">Reservation Queue</h2>
+                <div class="portal-mini-list">
+                    <article th:each="item : ${dashboard.reservations()}">
+                        <strong th:text="${item.record().book.title}">Book</strong>
+                        <span th:text="${item.queuePosition() > 0 ? #messages.msg('portal.queuePosition', item.queuePosition()) : #messages.msg('reservationStatus.' + item.record().status.name())}">Queue</span>
+                        <small th:text="${item.record().expiresAt == null ? '-' : #temporals.format(item.record().expiresAt, 'yyyy-MM-dd HH:mm')}">Time</small>
+                        <form th:action="@{/portal/reservations/{id}/cancel(id=${item.record().id})}" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs layui-btn-primary" type="submit" th:text="#{reservation.cancel}">Cancel</button>
+                        </form>
+                    </article>
+                </div>
+                <div class="empty-result" th:if="${dashboard.reservations().isEmpty()}" th:text="#{portal.emptyReservations}">No active reservations.</div>
+            </article>
+
+            <article class="panel portal-panel">
+                <h2 class="section-title" th:text="#{portal.recommendedForYou}">Recommended for You</h2>
+                <div class="portal-mini-list">
+                    <article th:each="item : ${dashboard.recommendations()}">
+                        <strong th:text="${item.book().title}">Book</strong>
+                        <span th:text="${#messages.msg(item.reason())}">Reason</span>
+                        <small th:text="#{recommendation.score(${item.score()})}">Score</small>
+                        <a class="layui-btn layui-btn-xs layui-btn-primary" th:href="@{/books(keyword=${item.book().isbn})}" th:text="#{portal.viewBook}">View</a>
+                    </article>
+                </div>
+                <div class="empty-result" th:if="${dashboard.recommendations().isEmpty()}" th:text="#{recommendation.empty.data}">No recommendation data yet.</div>
+            </article>
+        </section>
+
+        <section class="portal-grid">
+            <article class="panel portal-panel">
+                <h2 class="section-title" th:text="#{portal.fineCenter}">Fine Center</h2>
+                <div class="portal-mini-list">
+                    <article th:each="fine : ${dashboard.fines()}">
+                        <strong th:text="${fine.reason}">Reason</strong>
+                        <span th:text="${fine.amount}">0</span>
+                        <small th:text="${#messages.msg('fineStatus.' + fine.status.name())}">Status</small>
+                        <form th:if="${fine.status.name() == 'UNPAID'}" th:action="@{/portal/fines/{id}/pay(id=${fine.id})}" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs" type="submit" th:text="#{portal.payOnline}">Pay online</button>
+                        </form>
+                    </article>
+                </div>
+                <div class="empty-result" th:if="${dashboard.fines().isEmpty()}" th:text="#{portal.emptyFines}">No fines.</div>
+            </article>
+
+            <article class="panel portal-panel">
+                <h2 class="section-title" th:text="#{portal.recentMessages}">Recent Messages</h2>
+                <div class="portal-mini-list">
+                    <article th:each="notification : ${dashboard.notifications()}" th:classappend="${notification.status.name() == 'UNREAD' ? ' unread' : ''}">
+                        <strong th:text="${notification.title}">Message</strong>
+                        <span th:text="${notification.content}">Content</span>
+                        <small th:text="${#temporals.format(notification.sentAt, 'yyyy-MM-dd HH:mm')}">Time</small>
+                        <form th:if="${notification.status.name() == 'UNREAD'}" th:action="@{/portal/notifications/{id}/read(id=${notification.id})}" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs layui-btn-primary" type="submit" th:text="#{common.markRead}">Mark read</button>
+                        </form>
+                    </article>
+                </div>
+                <div class="empty-result" th:if="${dashboard.notifications().isEmpty()}" th:text="#{portal.emptyMessages}">No messages.</div>
+            </article>
+
+            <article class="panel portal-panel">
+                <h2 class="section-title" th:text="#{portal.borrowHistory}">Borrow History</h2>
+                <ul class="dashboard-list">
+                    <li th:each="record : ${dashboard.history()}">
+                        <strong th:text="${record.book.title}">Book</strong>
+                        <span th:text="${record.returnDate == null ? #messages.msg('borrowStatus.' + record.status.name()) : record.returnDate}">Date</span>
+                    </li>
+                </ul>
+                <div class="empty-result" th:if="${dashboard.history().isEmpty()}" th:text="#{portal.emptyHistory}">No borrow history.</div>
+            </article>
+        </section>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
+</body>
+</html>

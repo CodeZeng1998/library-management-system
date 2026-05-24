@@ -5,10 +5,10 @@ spring:
   application:
     name: library-management-system
   datasource:
-    url: jdbc:mysql://localhost:3306/library_management_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: 123456
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${LMS_DATASOURCE_URL}
+    username: ${LMS_DATASOURCE_USERNAME}
+    password: ${LMS_DATASOURCE_PASSWORD}
+    driver-class-name: ${LMS_DATASOURCE_DRIVER:com.mysql.cj.jdbc.Driver}
   jpa:
     hibernate:
       ddl-auto: update
@@ -21,4 +21,4 @@ spring:
 
 app:
   security:
-    remember-me-key: library-management-system-dev-key
+    remember-me-key: ${LMS_REMEMBER_ME_KEY}

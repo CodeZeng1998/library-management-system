@@ -200,10 +200,62 @@ textarea::placeholder {
     background: var(--sidebar-hover);
 }
 
+.sidebar-settings {
+    position: relative;
+    margin: 0 6px 14px;
+}
+
+.sidebar-settings summary {
+    list-style: none;
+}
+
+.sidebar-settings summary::-webkit-details-marker {
+    display: none;
+}
+
+.settings-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 38px;
+    padding: 0 10px;
+    color: var(--sidebar-link);
+    background: var(--sidebar-hover);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.settings-button:hover,
+.sidebar-settings[open] .settings-button {
+    color: var(--sidebar-text);
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+.settings-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    font-size: 16px;
+}
+
+.settings-menu {
+    display: grid;
+    gap: 12px;
+    margin-top: 8px;
+    padding: 12px;
+    background: color-mix(in srgb, var(--sidebar-hover) 84%, black);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+}
+
 .theme-panel {
     display: grid;
     gap: 6px;
-    margin: 0 6px 18px;
+    margin: 0;
 }
 
 .theme-label {
@@ -476,9 +528,10 @@ textarea::placeholder {
     background: var(--surface-alt);
 }
 
-.advanced-search summary {
-    cursor: pointer;
+.advanced-search h2 {
+    margin: 0;
     font-weight: 700;
+    font-size: 15px;
     color: var(--text);
 }
 
@@ -568,6 +621,48 @@ textarea::placeholder {
     font-size: 13px;
 }
 
+.view-toggle {
+    display: inline-flex;
+    gap: 4px;
+    padding: 3px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.view-toggle label {
+    position: relative;
+    display: inline-grid;
+    grid-auto-flow: column;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 10px;
+    border-radius: 4px;
+    color: var(--text-soft);
+    cursor: pointer;
+}
+
+.view-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.view-toggle label:has(input:checked) {
+    color: var(--accent-text);
+    background: var(--accent);
+}
+
+.view-toggle span {
+    font-size: 15px;
+    line-height: 1;
+}
+
+.view-toggle em {
+    font-style: normal;
+}
+
 .saved-searches {
     display: grid;
     gap: 12px;
@@ -575,7 +670,28 @@ textarea::placeholder {
 
 .saved-searches strong {
     display: block;
+}
+
+.saved-search-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     margin-bottom: 8px;
+}
+
+.text-button {
+    padding: 0;
+    color: var(--accent);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+}
+
+.text-button:hover {
+    text-decoration: underline;
 }
 
 .search-chip-row {
@@ -1134,6 +1250,280 @@ textarea::placeholder {
     font-style: normal;
 }
 
+.recommendation-card-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.recommendation-card-list.compact .recommendation-card {
+    grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.recommendation-card-list.compact .book-cover {
+    width: 72px;
+    height: 96px;
+}
+
+.recommendation-card {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 12px;
+    padding: 10px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.recommendation-card .book-cover {
+    width: 88px;
+    height: 118px;
+}
+
+.recommendation-card-body {
+    display: grid;
+    align-content: start;
+    gap: 7px;
+    min-width: 0;
+}
+
+.recommendation-card-body h3 {
+    margin: 0;
+    font-size: 15px;
+    overflow-wrap: anywhere;
+}
+
+.recommendation-card-body span,
+.recommendation-reason {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.score-meter {
+    height: 7px;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+}
+
+.score-meter span {
+    display: block;
+    width: var(--score, 30%);
+    height: 100%;
+    background: var(--accent);
+}
+
+.recommendation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.portal-page {
+    display: grid;
+    gap: 16px;
+}
+
+.portal-subtitle {
+    margin: 6px 0 0;
+    color: var(--text-soft);
+}
+
+.portal-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.portal-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.portal-panel {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    min-height: 260px;
+}
+
+.portal-panel-wide {
+    grid-column: span 2;
+}
+
+.portal-card-list,
+.portal-mini-list {
+    display: grid;
+    gap: 10px;
+}
+
+.loan-card {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.loan-card-body {
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    min-width: 0;
+}
+
+.loan-card-body header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.loan-card-body h3 {
+    margin: 0;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+}
+
+.portal-mini-list article {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.portal-mini-list article.unread {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+}
+
+.portal-mini-list strong,
+.portal-mini-list span,
+.portal-mini-list small {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.portal-mini-list span,
+.portal-mini-list small {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.notification-center {
+    display: grid;
+    gap: 14px;
+}
+
+.notification-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.notification-tabs a {
+    min-height: 32px;
+    padding: 7px 12px;
+    color: var(--text-soft);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.notification-tabs a.active {
+    color: var(--accent-text);
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.notification-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.select-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: auto;
+    color: var(--text-soft);
+}
+
+.notification-list {
+    display: grid;
+    gap: 10px;
+}
+
+.notification-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.notification-card.unread {
+    border-color: var(--accent-border);
+    box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.notification-check {
+    margin-top: 4px;
+}
+
+.notification-card-body {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+
+.notification-card-body header,
+.notification-card-body footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.notification-card-body header div {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.notification-card-body strong,
+.notification-card-body span,
+.notification-card-body p {
+    overflow-wrap: anywhere;
+}
+
+.notification-card-body span,
+.notification-card-body footer,
+.notification-card-body em {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: normal;
+}
+
+.notification-card-body p {
+    margin: 0;
+    color: var(--text);
+    line-height: 1.55;
+}
+
 .ranking-list {
     counter-reset: rank;
 }
@@ -1343,9 +1733,13 @@ textarea::placeholder {
         margin: 2px 6px 8px;
     }
 
-    .theme-panel {
+    .sidebar-settings {
         width: 100%;
         margin: 0 6px 8px;
+    }
+
+    .settings-menu {
+        grid-template-columns: repeat(3, minmax(160px, 1fr));
     }
 
     .nav-link {
@@ -1374,6 +1768,7 @@ textarea::placeholder {
     .book-card-grid,
     .book-card,
     .book-detail-item,
+    .recommendation-card,
     .book-meta,
     .detail-meta {
         grid-template-columns: 1fr;
@@ -1406,6 +1801,8 @@ textarea::placeholder {
     }
 
     .stat-grid,
+    .portal-metrics,
+    .portal-grid,
     .dashboard-metrics,
     .dashboard-grid,
     .dashboard-visual-grid,
@@ -1426,6 +1823,14 @@ textarea::placeholder {
 
     .chart-panel-wide {
         grid-column: auto;
+    }
+
+    .portal-panel-wide {
+        grid-column: auto;
+    }
+
+    .loan-card {
+        grid-template-columns: 1fr;
     }
 
     .chart-heading {

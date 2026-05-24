@@ -17,6 +17,10 @@ public interface BorrowRecordRepository extends JpaRepository<BorrowRecord, Long
 
     long countByReaderAndStatusIn(Reader reader, Collection<BorrowStatus> statuses);
 
+    List<BorrowRecord> findByReaderAndStatusInAndDeletedFalseOrderByDueDateAsc(Reader reader, Collection<BorrowStatus> statuses);
+
+    List<BorrowRecord> findByReaderAndDeletedFalseOrderByBorrowDateDesc(Reader reader);
+
     boolean existsByReaderAndStatusAndDueDateBefore(Reader reader, BorrowStatus status, LocalDate date);
 
     long countByStatusIn(Collection<BorrowStatus> statuses);

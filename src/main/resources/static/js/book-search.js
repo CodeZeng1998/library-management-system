@@ -7,6 +7,8 @@
     const historyBox = document.getElementById('bookSearchHistory');
     const favoritesBox = document.getElementById('bookSearchFavorites');
     const saveButton = document.getElementById('saveBookSearch');
+    const clearHistoryButton = document.getElementById('clearBookSearchHistory');
+    const clearFavoritesButton = document.getElementById('clearBookSearchFavorites');
     const historyKey = 'lms.bookSearch.history';
     const favoritesKey = 'lms.bookSearch.favorites';
 
@@ -25,6 +27,16 @@
             return;
         }
         saveSearch(favoritesKey, query, currentLabel(), 8);
+        renderSavedSearches();
+    });
+
+    clearHistoryButton?.addEventListener('click', () => {
+        localStorage.removeItem(historyKey);
+        renderSavedSearches();
+    });
+
+    clearFavoritesButton?.addEventListener('click', () => {
+        localStorage.removeItem(favoritesKey);
         renderSavedSearches();
     });
 

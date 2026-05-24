@@ -1,6 +1,7 @@
 package com.codezeng.lms.web;
 
 import com.codezeng.lms.repository.NotificationRepository;
+import com.codezeng.lms.domain.enums.NotificationStatus;
 import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.NotificationService;
 import org.springframework.data.domain.PageRequest;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.List;
 
 @Controller
 @RequestMapping("/notifications")
@@ -31,9 +34,15 @@ public class NotificationController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('NOTIFICATION_VIEW')")
-    public String list(@RequestParam(defaultValue = "0") int page, Model model) {
-        model.addAttribute("notifications", notificationRepository.findByDeletedFalse(
-                PageRequest.of(page, 12, Sort.by(Sort.Direction.DESC, "sentAt"))));
+    public String list(@RequestParam(defaultValue = "0") int page,
+                       @RequestParam(required = false) NotificationStatus status,
+                       Model model) {
+        PageRequest pageable = PageRequest.of(page, 12, Sort.by(Sort.Direction.DESC, "sentAt"));
+        model.addAttribute("notifications", status == null
+                ? notificationRepository.findByDeletedFalse(pageable)
+                : notificationRepository.findByStatusAndDeletedFalse(status, pageable));
+        model.addAttribute("status", status);
+        model.addAttribute("unreadCount", notificationRepository.countByStatusAndDeletedFalse(NotificationStatus.UNREAD));
         return "notification/list";
     }
 
@@ -42,6 +51,26 @@ public class NotificationController {
     public String markRead(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         notificationService.markRead(id);
         redirectAttributes.addFlashAttribute("message", i18n.get("flash.notification.read"));
+        return "redirect:/notifications";
+    }
+
+    @PostMapping("/batch")
+    @PreAuthorize("hasAuthority('NOTIFICATION_VIEW')")
+    public String batch(@RequestParam(required = false) List<Long> ids,
+                        @RequestParam String action,
+                        RedirectAttributes redirectAttributes) {
+        if (ids == null || ids.isEmpty()) {
+            redirectAttributes.addFlashAttribute("error", i18n.get("notification.batch.empty"));
+            return "redirect:/notifications";
+        }
+        int count;
+        if ("delete".equals(action)) {
+            count = notificationService.softDelete(ids);
+            redirectAttributes.addFlashAttribute("message", i18n.get("notification.batch.deleted", count));
+        } else {
+            count = notificationService.markRead(ids);
+            redirectAttributes.addFlashAttribute("message", i18n.get("notification.batch.read", count));
+        }
         return "redirect:/notifications";
     }
 }
