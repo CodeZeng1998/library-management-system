@@ -2,41 +2,42 @@
 <html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security">
 <body>
 <aside class="sidebar" th:fragment="sidebar">
-    <div class="brand" th:text="#{app.name}">图书管理系统</div>
+    <div class="brand" th:text="#{app.name}">Library Management System</div>
     <div class="theme-panel">
-        <label class="theme-label" for="themeMode" th:text="#{theme.label}">主题</label>
-        <select id="themeMode" class="theme-switcher" aria-label="主题模式">
-            <option value="auto" th:text="#{theme.auto}">自动模式</option>
-            <option value="light" th:text="#{theme.light}">浅色模式</option>
-            <option value="dark" th:text="#{theme.dark}">深色模式</option>
-            <option value="eye" th:text="#{theme.eye}">护眼模式</option>
+        <label class="theme-label" for="themeMode" th:text="#{theme.label}">Theme</label>
+        <select id="themeMode" class="theme-switcher" aria-label="Theme mode">
+            <option value="auto" th:text="#{theme.auto}">Auto</option>
+            <option value="light" th:text="#{theme.light}">Light</option>
+            <option value="dark" th:text="#{theme.dark}">Dark</option>
+            <option value="eye" th:text="#{theme.eye}">Eye Comfort</option>
         </select>
     </div>
     <div class="theme-panel">
-        <label class="theme-label" for="localeMode" th:text="#{language.label}">语言</label>
-        <select id="localeMode" class="theme-switcher" aria-label="语言切换" th:data-current-locale="${#locale.toString()}">
-            <option value="zh_CN" th:text="#{language.zh_CN}">简体中文</option>
-            <option value="zh_TW" th:text="#{language.zh_TW}">繁體中文</option>
+        <label class="theme-label" for="localeMode" th:text="#{language.label}">Language</label>
+        <select id="localeMode" class="theme-switcher" aria-label="Language" th:data-current-locale="${#locale.toString()}">
+            <option value="zh_CN" th:text="#{language.zh_CN}">Simplified Chinese</option>
+            <option value="zh_TW" th:text="#{language.zh_TW}">Traditional Chinese</option>
             <option value="en" th:text="#{language.en}">English</option>
         </select>
     </div>
     <div class="theme-panel">
-        <label class="theme-label" for="densityMode" th:text="#{density.label}">密度</label>
-        <select id="densityMode" class="theme-switcher" aria-label="信息密度">
-            <option value="compact" th:text="#{density.compact}">紧凑</option>
-            <option value="comfortable" th:text="#{density.comfortable}">舒适</option>
+        <label class="theme-label" for="densityMode" th:text="#{density.label}">Density</label>
+        <select id="densityMode" class="theme-switcher" aria-label="Information density">
+            <option value="compact" th:text="#{density.compact}">Compact</option>
+            <option value="comfortable" th:text="#{density.comfortable}">Comfortable</option>
         </select>
     </div>
-    <a class="nav-link" th:href="@{/}" sec:authorize="hasAuthority('DASHBOARD_VIEW')" th:text="#{nav.dashboard}">数据看板</a>
-    <a class="nav-link" th:href="@{/books}" sec:authorize="hasAuthority('BOOK_VIEW')" th:text="#{nav.books}">图书管理</a>
-    <a class="nav-link" th:href="@{/readers}" sec:authorize="hasAuthority('READER_VIEW')" th:text="#{nav.readers}">读者管理</a>
-    <a class="nav-link" th:href="@{/borrow}" sec:authorize="hasAuthority('BORROW_MANAGE')" th:text="#{nav.borrow}">借阅管理</a>
-    <a class="nav-link" th:href="@{/reservations}" sec:authorize="hasAuthority('RESERVATION_MANAGE')" th:text="#{nav.reservations}">预约管理</a>
-    <a class="nav-link" th:href="@{/notifications}" sec:authorize="hasAuthority('NOTIFICATION_VIEW')" th:text="#{nav.notifications}">消息中心</a>
-    <a class="nav-link" th:href="@{/fines}" sec:authorize="hasAuthority('FINE_VIEW')" th:text="#{nav.fines}">罚款管理</a>
-    <a class="nav-link" th:href="@{/users}" sec:authorize="hasAuthority('USER_MANAGE')" th:text="#{nav.users}">用户管理</a>
-    <a class="nav-link" th:href="@{/system/configs}" sec:authorize="hasAuthority('CONFIG_MANAGE')" th:text="#{nav.configs}">系统配置</a>
-    <a class="nav-link" th:href="@{/system/logs}" sec:authorize="hasAuthority('LOG_VIEW')" th:text="#{nav.logs}">操作日志</a>
+    <a class="nav-link" th:href="@{/}" sec:authorize="hasAuthority('DASHBOARD_VIEW')" th:text="#{nav.dashboard}">Dashboard</a>
+    <a class="nav-link" th:href="@{/recommendations}" sec:authorize="hasAuthority('RECOMMENDATION_VIEW')" th:text="#{nav.recommendations}">Recommendations</a>
+    <a class="nav-link" th:href="@{/books}" sec:authorize="hasAuthority('BOOK_VIEW')" th:text="#{nav.books}">Books</a>
+    <a class="nav-link" th:href="@{/readers}" sec:authorize="hasAuthority('READER_VIEW')" th:text="#{nav.readers}">Readers</a>
+    <a class="nav-link" th:href="@{/borrow}" sec:authorize="hasAuthority('BORROW_MANAGE')" th:text="#{nav.borrow}">Circulation</a>
+    <a class="nav-link" th:href="@{/reservations}" sec:authorize="hasAuthority('RESERVATION_MANAGE')" th:text="#{nav.reservations}">Reservations</a>
+    <a class="nav-link" th:href="@{/notifications}" sec:authorize="hasAuthority('NOTIFICATION_VIEW')" th:text="#{nav.notifications}">Messages</a>
+    <a class="nav-link" th:href="@{/fines}" sec:authorize="hasAuthority('FINE_VIEW')" th:text="#{nav.fines}">Fines</a>
+    <a class="nav-link" th:href="@{/users}" sec:authorize="hasAuthority('USER_MANAGE')" th:text="#{nav.users}">Users</a>
+    <a class="nav-link" th:href="@{/system/configs}" sec:authorize="hasAuthority('CONFIG_MANAGE')" th:text="#{nav.configs}">System Config</a>
+    <a class="nav-link" th:href="@{/system/logs}" sec:authorize="hasAuthority('LOG_VIEW')" th:text="#{nav.logs}">Operation Logs</a>
     <script th:src="@{/js/theme.js}"></script>
     <script th:src="@{/js/i18n.js}"></script>
     <script th:src="@{/js/density.js}"></script>

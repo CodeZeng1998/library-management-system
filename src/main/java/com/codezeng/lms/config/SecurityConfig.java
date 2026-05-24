@@ -27,6 +27,7 @@ public class SecurityConfig {
                         .requestMatchers("/users/**").hasAuthority("USER_MANAGE")
                         .requestMatchers("/system/configs/**").hasAuthority("CONFIG_MANAGE")
                         .requestMatchers("/system/logs/**").hasAuthority("LOG_VIEW")
+                        .requestMatchers("/recommendations/**").hasAuthority("RECOMMENDATION_VIEW")
                         .requestMatchers("/books/**").hasAuthority("BOOK_VIEW")
                         .requestMatchers("/readers/**").hasAuthority("READER_VIEW")
                         .requestMatchers("/borrow/**").hasAuthority("BORROW_MANAGE")

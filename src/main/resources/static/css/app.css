@@ -947,6 +947,123 @@ textarea::placeholder {
     background: var(--error-text);
 }
 
+.recommendation-page {
+    display: grid;
+    gap: 16px;
+}
+
+.recommendation-filter form {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.3fr) auto;
+    gap: 12px;
+    align-items: end;
+}
+
+.recommendation-filter label {
+    display: grid;
+    gap: 6px;
+}
+
+.recommendation-filter label span,
+.recommendation-context {
+    color: var(--text-soft);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.recommendation-context {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.recommendation-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.recommendation-panel {
+    min-height: 300px;
+}
+
+.recommendation-list,
+.ranking-list {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.recommendation-list li,
+.ranking-list li,
+.subject-list {
+    display: grid;
+    gap: 5px;
+    padding: 10px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.recommendation-list strong,
+.ranking-list strong,
+.subject-list strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recommendation-list span,
+.recommendation-list em,
+.ranking-list span,
+.subject-list span {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: normal;
+}
+
+.ranking-list {
+    counter-reset: rank;
+}
+
+.ranking-list li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+}
+
+.ranking-list li::before {
+    counter-increment: rank;
+    content: counter(rank);
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    color: var(--accent-text);
+    background: var(--accent);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.subject-list-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.subject-list header {
+    display: grid;
+    gap: 4px;
+}
+
+.subject-list h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
 .import-bar {
     display: grid;
     grid-template-columns: minmax(220px, 360px) auto 1fr;
@@ -1161,6 +1278,9 @@ textarea::placeholder {
     .stat-grid,
     .dashboard-metrics,
     .dashboard-grid,
+    .recommendation-filter form,
+    .recommendation-grid,
+    .subject-list-grid,
     .form-grid,
     .permission-checks,
     .import-bar {

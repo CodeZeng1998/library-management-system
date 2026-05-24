@@ -8,6 +8,7 @@ import java.util.Set;
 
 public enum Permission {
     DASHBOARD_VIEW("Dashboard menu", UserRole.SUPER_ADMIN, UserRole.LIBRARIAN, UserRole.READER),
+    RECOMMENDATION_VIEW("Recommendation center", UserRole.SUPER_ADMIN, UserRole.LIBRARIAN, UserRole.READER),
     BOOK_VIEW("Book menu and query", UserRole.SUPER_ADMIN, UserRole.READER),
     BOOK_EDIT("Create or edit books", UserRole.SUPER_ADMIN),
     BOOK_DELETE("Delete books", UserRole.SUPER_ADMIN),

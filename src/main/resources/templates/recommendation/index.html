@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|#{recommendation.title} - #{app.name}|">Recommendations - Library Management System</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <div th:replace="~{fragments/nav :: sidebar}"></div>
+    <main class="content recommendation-page">
+        <div class="topbar">
+            <h1 class="page-title" th:text="#{recommendation.title}">Recommendation Center</h1>
+        </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
+
+        <section class="panel recommendation-filter">
+            <form th:action="@{/recommendations}" method="get">
+                <label>
+                    <span th:text="#{recommendation.readerProfile}">Reader profile</span>
+                    <select name="readerId" class="layui-select">
+                        <option value="" th:text="#{recommendation.libraryWide}">Library-wide recommendations</option>
+                        <option th:each="reader : ${readers}"
+                                th:value="${reader.id}"
+                                th:selected="${readerId != null and reader.id == readerId}"
+                                th:text="${reader.readerNo + ' / ' + reader.name}"></option>
+                    </select>
+                </label>
+                <label>
+                    <span th:text="#{recommendation.seedBook}">Seed book</span>
+                    <select name="bookId" class="layui-select">
+                        <option value="" th:text="#{recommendation.autoSeedBook}">Auto select a popular borrowed book</option>
+                        <option th:each="book : ${books}"
+                                th:value="${book.id}"
+                                th:selected="${bookId != null and book.id == bookId}"
+                                th:text="${book.title + ' / ' + book.isbn}"></option>
+                    </select>
+                </label>
+                <button class="layui-btn" type="submit" th:text="#{recommendation.refresh}">Refresh</button>
+            </form>
+            <div class="recommendation-context">
+                <span th:if="${dashboard.selectedReader() != null}"
+                      th:text="#{recommendation.readerContext(${dashboard.selectedReader().readerNo + ' ' + dashboard.selectedReader().name})}">Reader</span>
+                <span th:if="${dashboard.selectedReader() == null}" th:text="#{recommendation.readerAll}">Reader: all readers</span>
+                <span th:if="${dashboard.selectedBook() != null}"
+                      th:text="#{recommendation.seedContext(${dashboard.selectedBook().title})}">Seed book</span>
+            </div>
+        </section>
+
+        <section class="recommendation-grid">
+            <article class="panel recommendation-panel">
+                <h2 class="section-title" th:text="#{recommendation.forReader}">For This Reader</h2>
+                <ul class="recommendation-list">
+                    <li th:each="item : ${dashboard.collaborative()}">
+                        <strong th:text="${item.book().title}">Book</strong>
+                        <span th:text="${#messages.msg(item.reason())}">Reason</span>
+                        <em th:text="#{recommendation.score(${item.score()})}">Score</em>
+                    </li>
+                </ul>
+                <div class="empty-result" th:if="${dashboard.collaborative().isEmpty()}" th:text="#{recommendation.empty.data}">No recommendation data yet.</div>
+            </article>
+
+            <article class="panel recommendation-panel">
+                <h2 class="section-title" th:text="#{recommendation.alsoBorrowed}">Readers Also Borrowed</h2>
+                <ul class="recommendation-list">
+                    <li th:each="item : ${dashboard.borrowedTogether()}">
+                        <strong th:text="${item.book().title}">Book</strong>
+                        <span th:text="${#messages.msg(item.reason())}">Reason</span>
+                        <em th:text="#{recommendation.sharedBorrows(${item.score()})}">Count</em>
+                    </li>
+                </ul>
+                <div class="empty-result" th:if="${dashboard.borrowedTogether().isEmpty()}" th:text="#{recommendation.empty.seed}">Choose a seed book with borrowing history.</div>
+            </article>
+
+            <article class="panel recommendation-panel">
+                <h2 class="section-title" th:text="#{recommendation.newPreferred}">New In Preferred Subjects</h2>
+                <ul class="recommendation-list">
+                    <li th:each="item : ${dashboard.newArrivals()}">
+                        <strong th:text="${item.book().title}">Book</strong>
+                        <span th:text="${item.book().category != null ? @localizedTextService.categoryName(item.book().category) : #messages.msg('common.unclassified')}">Category</span>
+                        <em th:text="${item.book().createTime == null ? '-' : #temporals.format(item.book().createTime, 'yyyy-MM-dd')}">Date</em>
+                    </li>
+                </ul>
+                <div class="empty-result" th:if="${dashboard.newArrivals().isEmpty()}" th:text="#{recommendation.empty.newBooks}">No matching new books yet.</div>
+            </article>
+        </section>
+
+        <section class="recommendation-grid ranking-grid">
+            <article class="panel recommendation-panel">
+                <h2 class="section-title" th:text="#{recommendation.weeklyHot}">Weekly Hot List</h2>
+                <ol class="ranking-list">
+                    <li th:each="item : ${dashboard.weeklyHot()}">
+                        <strong th:text="${item.book().title}">Book</strong>
+                        <span th:text="#{recommendation.borrowCount(${item.borrowCount()})}">0</span>
+                    </li>
+                </ol>
+            </article>
+            <article class="panel recommendation-panel">
+                <h2 class="section-title" th:text="#{recommendation.monthlyHot}">Monthly Hot List</h2>
+                <ol class="ranking-list">
+                    <li th:each="item : ${dashboard.monthlyHot()}">
+                        <strong th:text="${item.book().title}">Book</strong>
+                        <span th:text="#{recommendation.borrowCount(${item.borrowCount()})}">0</span>
+                    </li>
+                </ol>
+            </article>
+            <article class="panel recommendation-panel">
+                <h2 class="section-title" th:text="#{recommendation.yearlyHot}">Yearly Hot List</h2>
+                <ol class="ranking-list">
+                    <li th:each="item : ${dashboard.yearlyHot()}">
+                        <strong th:text="${item.book().title}">Book</strong>
+                        <span th:text="#{recommendation.borrowCount(${item.borrowCount()})}">0</span>
+                    </li>
+                </ol>
+            </article>
+        </section>
+
+        <section class="panel">
+            <div class="table-toolbar">
+                <h2 class="section-title" th:text="#{recommendation.subjectLists}">Subject Reading Lists</h2>
+            </div>
+            <div class="subject-list-grid">
+                <article class="subject-list" th:each="list : ${dashboard.subjectLists()}">
+                    <header>
+                        <h3 th:text="${list.subject()}">Subject</h3>
+                        <span th:text="#{recommendation.teacherRecommended}">Teacher recommended</span>
+                    </header>
+                    <ul class="dashboard-list">
+                        <li th:each="item : ${list.books()}">
+                            <strong th:text="${item.book().title}">Book</strong>
+                            <span th:text="#{recommendation.score(${item.score()})}">0</span>
+                        </li>
+                    </ul>
+                </article>
+            </div>
+        </section>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
+</body>
+</html>
