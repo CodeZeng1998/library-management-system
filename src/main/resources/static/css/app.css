@@ -1175,10 +1175,31 @@ textarea::placeholder {
 
 .import-bar {
     display: grid;
-    grid-template-columns: minmax(220px, 360px) auto 1fr;
+    grid-template-columns: minmax(220px, 360px) repeat(3, auto) minmax(220px, 1fr);
     align-items: center;
     gap: 10px;
     margin-bottom: 14px;
+}
+
+.import-preview-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.import-preview-summary > div:first-child {
+    display: grid;
+    gap: 4px;
+}
+
+.import-row-ok td:first-child {
+    border-left: 4px solid var(--success-text);
+}
+
+.import-row-error td:first-child {
+    border-left: 4px solid var(--error-text);
 }
 
 .hint {
@@ -1396,6 +1417,11 @@ textarea::placeholder {
     .permission-checks,
     .import-bar {
         grid-template-columns: 1fr;
+    }
+
+    .import-preview-summary {
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .chart-panel-wide {

@@ -2,12 +2,12 @@ package com.codezeng.lms.service;
 
 import com.codezeng.lms.domain.Book;
 import com.codezeng.lms.domain.BookCategory;
-import jakarta.persistence.criteria.Join;
-import jakarta.persistence.criteria.JoinType;
-import jakarta.persistence.criteria.Predicate;
 import com.codezeng.lms.repository.BookCategoryRepository;
 import com.codezeng.lms.repository.BookRepository;
 import com.codezeng.lms.security.DataScopeService;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -69,22 +69,19 @@ public class BookService {
 
             if (StringUtils.hasText(criteria.getKeyword())) {
                 String keyword = clean(criteria.getKeyword());
-                String like = contains(keyword);
                 Join<Book, BookCategory> category = root.join("category", JoinType.LEFT);
                 List<Predicate> keywordPredicates = new ArrayList<>();
                 for (String variant : variants(keyword)) {
-                    String variantLike = contains(variant);
-                    keywordPredicates.add(builder.like(builder.lower(root.get("title")), variantLike));
-                    keywordPredicates.add(builder.like(builder.lower(root.get("author")), variantLike));
-                    keywordPredicates.add(builder.like(builder.lower(root.get("isbn")), variantLike));
-                    keywordPredicates.add(builder.like(builder.lower(root.get("publisher")), variantLike));
-                    keywordPredicates.add(builder.like(builder.lower(root.get("location")), variantLike));
-                    keywordPredicates.add(builder.like(builder.lower(category.get("name")), variantLike));
+                    String like = contains(variant);
+                    keywordPredicates.add(builder.like(builder.lower(root.get("title")), like));
+                    keywordPredicates.add(builder.like(builder.lower(root.get("author")), like));
+                    keywordPredicates.add(builder.like(builder.lower(root.get("isbn")), like));
+                    keywordPredicates.add(builder.like(builder.lower(root.get("publisher")), like));
+                    keywordPredicates.add(builder.like(builder.lower(root.get("location")), like));
+                    keywordPredicates.add(builder.like(builder.lower(category.get("name")), like));
                 }
-                categoryIdsByInitials(keyword).forEach(id -> keywordPredicates.add(builder.equal(category.get("id"), id)));
                 predicates.add(builder.or(keywordPredicates.toArray(Predicate[]::new)));
             }
-
             if (StringUtils.hasText(criteria.getTitle())) {
                 predicates.add(textPredicate(builder, builder.lower(root.get("title")), criteria.getTitle(), criteria.getTitleMatch()));
             }
@@ -133,43 +130,7 @@ public class BookService {
     private Set<String> variants(String keyword) {
         Set<String> values = new LinkedHashSet<>();
         values.add(keyword);
-        values.add(keyword.replace('亞', '亚').replace('臺', '台').replace('圖', '图').replace('書', '书'));
-        values.add(keyword.replace('亚', '亞').replace('台', '臺').replace('图', '圖').replace('书', '書'));
         return values;
-    }
-
-    private List<Long> categoryIdsByInitials(String keyword) {
-        if (!keyword.matches("[a-z0-9]+")) {
-            return List.of();
-        }
-        return categoryRepository.findByDeletedFalseOrderByNameAsc().stream()
-                .filter(category -> initials(category.getName()).contains(keyword))
-                .map(BookCategory::getId)
-                .toList();
-    }
-
-    private String initials(String value) {
-        StringBuilder result = new StringBuilder();
-        for (char ch : value.toCharArray()) {
-            if (ch == '计') {
-                result.append('j');
-            } else if (ch == '算') {
-                result.append('s');
-            } else if (ch == '机') {
-                result.append('j');
-            } else if (ch == '文') {
-                result.append('w');
-            } else if (ch == '学') {
-                result.append('x');
-            } else if (ch == '历') {
-                result.append('l');
-            } else if (ch == '史') {
-                result.append('s');
-            } else if (Character.isLetterOrDigit(ch)) {
-                result.append(Character.toLowerCase(ch));
-            }
-        }
-        return result.toString();
     }
 
     @Transactional
@@ -185,7 +146,7 @@ public class BookService {
             book.setAvailableQuantity(book.getTotalQuantity());
         }
         Book saved = bookRepository.save(book);
-        operationLogService.record("图书管理", "保存图书", saved.getTitle());
+        operationLogService.record("Book management", "Save book", saved.getTitle());
         return saved;
     }
 
@@ -198,49 +159,77 @@ public class BookService {
         }
         book.setDeleted(true);
         bookRepository.save(book);
-        operationLogService.record("图书管理", "删除图书", book.getTitle());
+        operationLogService.record("Book management", "Delete book", book.getTitle());
     }
 
     @Transactional
     public ImportResult importCsv(MultipartFile file) throws IOException {
-        List<String[]> rows = CsvSupport.readRows(file);
+        return importCsv(file.getBytes());
+    }
+
+    @Transactional
+    public ImportResult importCsv(byte[] bytes) throws IOException {
+        ImportResult result = processCsv(CsvSupport.readRows(bytes), true);
+        operationLogService.record("Book management", "Batch import books", result.toMessage());
+        return result;
+    }
+
+    public ImportResult previewCsv(MultipartFile file) throws IOException {
+        return processCsv(CsvSupport.readRows(file), false);
+    }
+
+    public String importTemplateCsv() {
+        return "\uFEFFISBN,Title,Author,Publisher,Category,TotalQuantity,AvailableQuantity,Location,Price\n"
+                + "9787110000001,Sample Book,Sample Author,Sample Publisher,Computer Science,5,5,Main Library A-01,59.00\n";
+    }
+
+    private ImportResult processCsv(List<String[]> rows, boolean persist) {
         ImportResult result = new ImportResult();
+        Set<String> seenIsbns = new LinkedHashSet<>();
         for (int i = 1; i < rows.size(); i++) {
             int rowNumber = i + 1;
             String[] row = rows.get(i);
             try {
                 if (row.length < 6) {
-                    result.addError(rowNumber, "至少需要ISBN、书名、作者、出版社、分类、总库存");
+                    result.addError(rowNumber, "At least ISBN, title, author, publisher, category and total quantity are required.", row);
                     continue;
                 }
                 String isbn = required(row, 0, "ISBN");
+                if (!seenIsbns.add(isbn)) {
+                    result.addError(rowNumber, "Duplicate ISBN in this file: " + isbn, row);
+                    continue;
+                }
                 if (bookRepository.findByIsbnAndDeletedFalse(isbn).isPresent()) {
-                    result.addError(rowNumber, "ISBN已存在：" + isbn);
+                    result.addError(rowNumber, "ISBN already exists: " + isbn, row);
                     continue;
                 }
                 Book book = new Book();
                 book.setIsbn(isbn);
-                book.setTitle(required(row, 1, "书名"));
-                book.setAuthor(required(row, 2, "作者"));
-                book.setPublisher(required(row, 3, "出版社"));
-                book.setCategory(resolveCategory(value(row, 4)));
-                int totalQuantity = integer(required(row, 5, "总库存"), "总库存");
+                book.setTitle(required(row, 1, "Title"));
+                book.setAuthor(required(row, 2, "Author"));
+                book.setPublisher(required(row, 3, "Publisher"));
+                if (persist) {
+                    book.setCategory(resolveCategory(value(row, 4)));
+                }
+                int totalQuantity = integer(required(row, 5, "Total quantity"), "Total quantity");
                 book.setTotalQuantity(totalQuantity);
                 book.setAvailableQuantity(integer(value(row, 6), totalQuantity));
                 book.setLocation(value(row, 7));
                 book.setPrice(decimal(value(row, 8)));
-                save(book);
-                result.incrementSuccessCount();
+                dataScopeService.requireAccess(book);
+                if (persist) {
+                    save(book);
+                }
+                result.addSuccess(rowNumber, row, persist ? "Imported" : "Ready to import");
             } catch (RuntimeException ex) {
-                result.addError(rowNumber, ex.getMessage());
+                result.addError(rowNumber, ex.getMessage(), row);
             }
         }
-        operationLogService.record("图书管理", "批量导入图书", result.toMessage());
         return result;
     }
 
     public String exportCsv() {
-        StringBuilder csv = new StringBuilder("\uFEFFISBN,书名,作者,出版社,分类,总库存,可借库存,位置,价格\n");
+        StringBuilder csv = new StringBuilder("\uFEFFISBN,Title,Author,Publisher,Category,TotalQuantity,AvailableQuantity,Location,Price\n");
         for (Book book : bookRepository.findAll(dataScopeService.bookScope(), Pageable.unpaged()).getContent()) {
             csv.append(CsvSupport.csv(book.getIsbn())).append(',')
                     .append(CsvSupport.csv(book.getTitle())).append(',')
@@ -263,7 +252,7 @@ public class BookService {
                 .orElseGet(() -> {
                     BookCategory category = new BookCategory();
                     category.setName(name);
-                    category.setDescription("批量导入自动创建");
+                    category.setDescription("Created by CSV import");
                     return categoryRepository.save(category);
                 });
     }
@@ -275,20 +264,20 @@ public class BookService {
     private String required(String[] row, int index, String fieldName) {
         String value = value(row, index);
         if (!StringUtils.hasText(value)) {
-            throw new IllegalArgumentException(fieldName + "不能为空");
+            throw new IllegalArgumentException(fieldName + " is required.");
         }
         return value;
     }
 
     private int integer(String value, int defaultValue) {
-        return StringUtils.hasText(value) ? integer(value, "数字字段") : defaultValue;
+        return StringUtils.hasText(value) ? integer(value, "Numeric field") : defaultValue;
     }
 
     private int integer(String value, String fieldName) {
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(fieldName + "必须是整数");
+            throw new IllegalArgumentException(fieldName + " must be an integer.");
         }
     }
 

@@ -16,7 +16,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ReaderService {
@@ -53,7 +55,7 @@ public class ReaderService {
             reader.setRegisteredAt(LocalDateTime.now());
         }
         Reader saved = readerRepository.save(reader);
-        operationLogService.record("读者管理", "保存读者", saved.getReaderNo() + " " + saved.getName());
+        operationLogService.record("Reader management", "Save reader", saved.getReaderNo() + " " + saved.getName());
         return saved;
     }
 
@@ -62,49 +64,94 @@ public class ReaderService {
         Reader reader = readerRepository.findById(id).orElseThrow();
         reader.setDeleted(true);
         readerRepository.save(reader);
-        operationLogService.record("读者管理", "删除读者", reader.getReaderNo());
+        operationLogService.record("Reader management", "Delete reader", reader.getReaderNo());
     }
 
     @Transactional
     public ImportResult importCsv(MultipartFile file) throws IOException {
-        List<String[]> rows = CsvSupport.readRows(file);
+        return importCsv(file.getBytes());
+    }
+
+    @Transactional
+    public ImportResult importCsv(byte[] bytes) throws IOException {
+        ImportResult result = processCsv(CsvSupport.readRows(bytes), true);
+        operationLogService.record("Reader management", "Batch import readers", result.toMessage());
+        return result;
+    }
+
+    public ImportResult previewCsv(MultipartFile file) throws IOException {
+        return processCsv(CsvSupport.readRows(file), false);
+    }
+
+    public String importTemplateCsv() {
+        return "\uFEFFReaderNo,Name,Gender,Phone,Email,IdentityNo,ReaderType,MemberLevel,Status,Deposit\n"
+                + "R20260001,Sample Reader,F,13800000000,sample.reader@example.com,S20260001,STUDENT,NORMAL,NORMAL,100.00\n";
+    }
+
+    private ImportResult processCsv(List<String[]> rows, boolean persist) {
         ImportResult result = new ImportResult();
+        Set<String> seenReaderNos = new LinkedHashSet<>();
+        Set<String> seenEmails = new LinkedHashSet<>();
+        Set<String> seenIdentityNos = new LinkedHashSet<>();
         for (int i = 1; i < rows.size(); i++) {
             int rowNumber = i + 1;
             String[] row = rows.get(i);
             try {
-                if (row.length < 5) {
-                    result.addError(rowNumber, "至少需要读者编号、姓名、电话、邮箱、证件号");
+                if (row.length < 6) {
+                    result.addError(rowNumber, "At least reader number, name, phone, email and identity number are required.", row);
                     continue;
                 }
                 String readerNo = value(row, 0);
+                String email = required(row, 4, "Email");
+                String identityNo = required(row, 5, "Identity number");
+                if (StringUtils.hasText(readerNo) && !seenReaderNos.add(readerNo)) {
+                    result.addError(rowNumber, "Duplicate reader number in this file: " + readerNo, row);
+                    continue;
+                }
+                if (!seenEmails.add(email)) {
+                    result.addError(rowNumber, "Duplicate email in this file: " + email, row);
+                    continue;
+                }
+                if (!seenIdentityNos.add(identityNo)) {
+                    result.addError(rowNumber, "Duplicate identity number in this file: " + identityNo, row);
+                    continue;
+                }
                 if (StringUtils.hasText(readerNo) && readerRepository.findByReaderNoAndDeletedFalse(readerNo).isPresent()) {
-                    result.addError(rowNumber, "读者编号已存在：" + readerNo);
+                    result.addError(rowNumber, "Reader number already exists: " + readerNo, row);
+                    continue;
+                }
+                if (readerRepository.existsByEmailAndDeletedFalse(email)) {
+                    result.addError(rowNumber, "Email already exists: " + email, row);
+                    continue;
+                }
+                if (readerRepository.existsByIdentityNoAndDeletedFalse(identityNo)) {
+                    result.addError(rowNumber, "Identity number already exists: " + identityNo, row);
                     continue;
                 }
                 Reader reader = new Reader();
                 reader.setReaderNo(readerNo);
-                reader.setName(required(row, 1, "姓名"));
+                reader.setName(required(row, 1, "Name"));
                 reader.setGender(value(row, 2));
                 reader.setPhone(value(row, 3));
-                reader.setEmail(required(row, 4, "邮箱"));
-                reader.setIdentityNo(required(row, 5, "证件号"));
+                reader.setEmail(email);
+                reader.setIdentityNo(identityNo);
                 reader.setReaderType(enumValue(ReaderType.class, value(row, 6), ReaderType.PUBLIC));
                 reader.setMemberLevel(enumValue(MemberLevel.class, value(row, 7), MemberLevel.NORMAL));
                 reader.setStatus(enumValue(AccountStatus.class, value(row, 8), AccountStatus.NORMAL));
                 reader.setDepositAmount(decimal(value(row, 9), BigDecimal.ZERO));
-                save(reader);
-                result.incrementSuccessCount();
+                if (persist) {
+                    save(reader);
+                }
+                result.addSuccess(rowNumber, row, persist ? "Imported" : "Ready to import");
             } catch (RuntimeException ex) {
-                result.addError(rowNumber, ex.getMessage());
+                result.addError(rowNumber, ex.getMessage(), row);
             }
         }
-        operationLogService.record("读者管理", "批量导入读者", result.toMessage());
         return result;
     }
 
     public String exportCsv() {
-        StringBuilder csv = new StringBuilder("\uFEFF读者编号,姓名,性别,电话,邮箱,证件号,类型,等级,状态,押金\n");
+        StringBuilder csv = new StringBuilder("\uFEFFReaderNo,Name,Gender,Phone,Email,IdentityNo,ReaderType,MemberLevel,Status,Deposit\n");
         for (Reader reader : readerRepository.findByDeletedFalse(Pageable.unpaged()).getContent()) {
             csv.append(CsvSupport.csv(reader.getReaderNo())).append(',')
                     .append(CsvSupport.csv(reader.getName())).append(',')
@@ -133,7 +180,7 @@ public class ReaderService {
     private String required(String[] row, int index, String fieldName) {
         String value = value(row, index);
         if (!StringUtils.hasText(value)) {
-            throw new IllegalArgumentException(fieldName + "不能为空");
+            throw new IllegalArgumentException(fieldName + " is required.");
         }
         return value;
     }

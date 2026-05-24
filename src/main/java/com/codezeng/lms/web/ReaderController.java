@@ -8,6 +8,7 @@ import com.codezeng.lms.repository.ReaderRepository;
 import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.ImportResult;
 import com.codezeng.lms.service.ReaderService;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +32,9 @@ import java.nio.charset.StandardCharsets;
 @Controller
 @RequestMapping("/readers")
 public class ReaderController {
+
+    private static final String READER_IMPORT_BYTES = "READER_IMPORT_BYTES";
+    private static final String READER_IMPORT_ERRORS = "READER_IMPORT_ERRORS";
 
     private final ReaderRepository readerRepository;
     private final ReaderService readerService;
@@ -87,9 +91,12 @@ public class ReaderController {
 
     @PostMapping("/import")
     @PreAuthorize("hasAuthority('READER_EDIT')")
-    public String importCsv(@RequestParam MultipartFile file, RedirectAttributes redirectAttributes) {
+    public String importCsv(@RequestParam MultipartFile file,
+                            HttpSession session,
+                            RedirectAttributes redirectAttributes) {
         try {
             ImportResult result = readerService.importCsv(file);
+            rememberErrorReport(session, READER_IMPORT_ERRORS, result);
             redirectAttributes.addFlashAttribute(result.getFailureCount() == 0 ? "message" : "error", result.toMessage());
         } catch (IOException ex) {
             redirectAttributes.addFlashAttribute("error", i18n.get("flash.import.failed", ex.getMessage()));
@@ -97,13 +104,80 @@ public class ReaderController {
         return "redirect:/readers";
     }
 
+    @PostMapping("/import/preview")
+    @PreAuthorize("hasAuthority('READER_EDIT')")
+    public String previewImport(@RequestParam MultipartFile file,
+                                HttpSession session,
+                                Model model,
+                                RedirectAttributes redirectAttributes) {
+        try {
+            session.setAttribute(READER_IMPORT_BYTES, file.getBytes());
+            ImportResult result = readerService.previewCsv(file);
+            rememberErrorReport(session, READER_IMPORT_ERRORS, result);
+            model.addAttribute("result", result);
+            model.addAttribute("importTitle", "Reader CSV import preview");
+            model.addAttribute("confirmUrl", "/readers/import/confirm");
+            model.addAttribute("cancelUrl", "/readers");
+            model.addAttribute("templateUrl", "/readers/import/template");
+            model.addAttribute("errorReportUrl", "/readers/import/errors");
+            return "import/preview";
+        } catch (IOException ex) {
+            redirectAttributes.addFlashAttribute("error", i18n.get("flash.import.failed", ex.getMessage()));
+            return "redirect:/readers";
+        }
+    }
+
+    @PostMapping("/import/confirm")
+    @PreAuthorize("hasAuthority('READER_EDIT')")
+    public String confirmImport(HttpSession session, RedirectAttributes redirectAttributes) {
+        byte[] bytes = (byte[]) session.getAttribute(READER_IMPORT_BYTES);
+        if (bytes == null) {
+            redirectAttributes.addFlashAttribute("error", "No previewed CSV file found. Please upload and preview again.");
+            return "redirect:/readers";
+        }
+        try {
+            ImportResult result = readerService.importCsv(bytes);
+            rememberErrorReport(session, READER_IMPORT_ERRORS, result);
+            session.removeAttribute(READER_IMPORT_BYTES);
+            redirectAttributes.addFlashAttribute(result.getFailureCount() == 0 ? "message" : "error", result.toMessage());
+        } catch (IOException ex) {
+            redirectAttributes.addFlashAttribute("error", i18n.get("flash.import.failed", ex.getMessage()));
+        }
+        return "redirect:/readers";
+    }
+
+    @GetMapping("/import/template")
+    @PreAuthorize("hasAuthority('READER_EDIT')")
+    public ResponseEntity<byte[]> importTemplate() {
+        return csvResponse("reader-import-template.csv", readerService.importTemplateCsv());
+    }
+
+    @GetMapping("/import/errors")
+    @PreAuthorize("hasAuthority('READER_EDIT')")
+    public ResponseEntity<byte[]> importErrors(HttpSession session) {
+        String csv = (String) session.getAttribute(READER_IMPORT_ERRORS);
+        return csvResponse("reader-import-errors.csv", csv == null ? "\uFEFFrow,status,message,values\n" : csv);
+    }
+
     @GetMapping("/export")
     @PreAuthorize("hasAuthority('READER_VIEW')")
     public ResponseEntity<byte[]> exportCsv() {
+        return csvResponse("readers.csv", readerService.exportCsv());
+    }
+
+    private void rememberErrorReport(HttpSession session, String key, ImportResult result) {
+        if (result.getFailureCount() > 0) {
+            session.setAttribute(key, result.errorReportCsv());
+        } else {
+            session.removeAttribute(key);
+        }
+    }
+
+    private ResponseEntity<byte[]> csvResponse(String filename, String csv) {
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=readers.csv")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
-                .body(readerService.exportCsv().getBytes(StandardCharsets.UTF_8));
+                .body(csv.getBytes(StandardCharsets.UTF_8));
     }
 
     private void addFormData(Model model, Reader reader) {

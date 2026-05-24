@@ -11,6 +11,10 @@ public interface ReaderRepository extends JpaRepository<Reader, Long> {
 
     Optional<Reader> findByReaderNoAndDeletedFalse(String readerNo);
 
+    boolean existsByEmailAndDeletedFalse(String email);
+
+    boolean existsByIdentityNoAndDeletedFalse(String identityNo);
+
     Page<Reader> findByDeletedFalseAndNameContainingIgnoreCaseOrDeletedFalseAndReaderNoContainingIgnoreCaseOrDeletedFalseAndPhoneContainingIgnoreCase(
             String name, String readerNo, String phone, Pageable pageable);
 

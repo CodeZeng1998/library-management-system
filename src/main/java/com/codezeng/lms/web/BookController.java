@@ -8,6 +8,7 @@ import com.codezeng.lms.service.BookSearchCriteria;
 import com.codezeng.lms.service.BookService;
 import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.ImportResult;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -35,6 +36,9 @@ import java.util.List;
 @Controller
 @RequestMapping("/books")
 public class BookController {
+
+    private static final String BOOK_IMPORT_BYTES = "BOOK_IMPORT_BYTES";
+    private static final String BOOK_IMPORT_ERRORS = "BOOK_IMPORT_ERRORS";
 
     private final BookRepository bookRepository;
     private final BookCategoryRepository categoryRepository;
@@ -116,9 +120,12 @@ public class BookController {
 
     @PostMapping("/import")
     @PreAuthorize("hasAuthority('BOOK_IMPORT')")
-    public String importCsv(@RequestParam MultipartFile file, RedirectAttributes redirectAttributes) {
+    public String importCsv(@RequestParam MultipartFile file,
+                            HttpSession session,
+                            RedirectAttributes redirectAttributes) {
         try {
             ImportResult result = bookService.importCsv(file);
+            rememberErrorReport(session, BOOK_IMPORT_ERRORS, result);
             redirectAttributes.addFlashAttribute(result.getFailureCount() == 0 ? "message" : "error", result.toMessage());
         } catch (IOException ex) {
             redirectAttributes.addFlashAttribute("error", i18n.get("flash.import.failed", ex.getMessage()));
@@ -126,13 +133,80 @@ public class BookController {
         return "redirect:/books";
     }
 
+    @PostMapping("/import/preview")
+    @PreAuthorize("hasAuthority('BOOK_IMPORT')")
+    public String previewImport(@RequestParam MultipartFile file,
+                                HttpSession session,
+                                Model model,
+                                RedirectAttributes redirectAttributes) {
+        try {
+            session.setAttribute(BOOK_IMPORT_BYTES, file.getBytes());
+            ImportResult result = bookService.previewCsv(file);
+            rememberErrorReport(session, BOOK_IMPORT_ERRORS, result);
+            model.addAttribute("result", result);
+            model.addAttribute("importTitle", "Book CSV import preview");
+            model.addAttribute("confirmUrl", "/books/import/confirm");
+            model.addAttribute("cancelUrl", "/books");
+            model.addAttribute("templateUrl", "/books/import/template");
+            model.addAttribute("errorReportUrl", "/books/import/errors");
+            return "import/preview";
+        } catch (IOException ex) {
+            redirectAttributes.addFlashAttribute("error", i18n.get("flash.import.failed", ex.getMessage()));
+            return "redirect:/books";
+        }
+    }
+
+    @PostMapping("/import/confirm")
+    @PreAuthorize("hasAuthority('BOOK_IMPORT')")
+    public String confirmImport(HttpSession session, RedirectAttributes redirectAttributes) {
+        byte[] bytes = (byte[]) session.getAttribute(BOOK_IMPORT_BYTES);
+        if (bytes == null) {
+            redirectAttributes.addFlashAttribute("error", "No previewed CSV file found. Please upload and preview again.");
+            return "redirect:/books";
+        }
+        try {
+            ImportResult result = bookService.importCsv(bytes);
+            rememberErrorReport(session, BOOK_IMPORT_ERRORS, result);
+            session.removeAttribute(BOOK_IMPORT_BYTES);
+            redirectAttributes.addFlashAttribute(result.getFailureCount() == 0 ? "message" : "error", result.toMessage());
+        } catch (IOException ex) {
+            redirectAttributes.addFlashAttribute("error", i18n.get("flash.import.failed", ex.getMessage()));
+        }
+        return "redirect:/books";
+    }
+
+    @GetMapping("/import/template")
+    @PreAuthorize("hasAuthority('BOOK_IMPORT')")
+    public ResponseEntity<byte[]> importTemplate() {
+        return csvResponse("book-import-template.csv", bookService.importTemplateCsv());
+    }
+
+    @GetMapping("/import/errors")
+    @PreAuthorize("hasAuthority('BOOK_IMPORT')")
+    public ResponseEntity<byte[]> importErrors(HttpSession session) {
+        String csv = (String) session.getAttribute(BOOK_IMPORT_ERRORS);
+        return csvResponse("book-import-errors.csv", csv == null ? "\uFEFFrow,status,message,values\n" : csv);
+    }
+
     @GetMapping("/export")
     @PreAuthorize("hasAuthority('BOOK_VIEW')")
     public ResponseEntity<byte[]> exportCsv() {
+        return csvResponse("books.csv", bookService.exportCsv());
+    }
+
+    private void rememberErrorReport(HttpSession session, String key, ImportResult result) {
+        if (result.getFailureCount() > 0) {
+            session.setAttribute(key, result.errorReportCsv());
+        } else {
+            session.removeAttribute(key);
+        }
+    }
+
+    private ResponseEntity<byte[]> csvResponse(String filename, String csv) {
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=books.csv")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
-                .body(bookService.exportCsv().getBytes(StandardCharsets.UTF_8));
+                .body(csv.getBytes(StandardCharsets.UTF_8));
     }
 
     private void normalizeCriteria(BookSearchCriteria criteria) {
