@@ -161,6 +161,7 @@ public class BorrowController {
     @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public ResponseEntity<ReturnResolveResponse> resolveReturn(@RequestParam String isbn) {
         return borrowRecordRepository.findFirstByBook_IsbnAndStatusInAndDeletedFalseOrderByDueDateAsc(isbn.trim(), ACTIVE_STATUSES)
+                .filter(dataScopeService::canAccess)
                 .map(record -> ResponseEntity.ok(new ReturnResolveResponse(true, i18n.get("api.borrow.returnQueued"), toRecordCard(record), estimateFine(record, false, false))))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(new ReturnResolveResponse(false, i18n.get("api.borrow.returnRecordNotFound"), null, BigDecimal.ZERO)));
@@ -200,6 +201,7 @@ public class BorrowController {
         try {
             BorrowRecord record = borrowRecordRepository
                     .findFirstByBook_IsbnAndStatusInAndDeletedFalseOrderByDueDateAsc(isbn.trim(), List.of(BorrowStatus.BORROWED))
+                    .filter(dataScopeService::canAccess)
                     .orElseThrow(() -> new IllegalStateException(i18n.get("api.borrow.renewRecordNotFound")));
             BorrowRecord renewed = borrowService.renew(record.getId());
             return ResponseEntity.ok(new ActionResponse(true, i18n.get("flash.borrow.renewed"), toRecordCard(renewed), toReaderCard(renewed.getReader())));

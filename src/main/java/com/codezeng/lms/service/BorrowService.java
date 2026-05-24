@@ -11,6 +11,7 @@ import com.codezeng.lms.repository.BookRepository;
 import com.codezeng.lms.repository.BorrowRecordRepository;
 import com.codezeng.lms.repository.FineRecordRepository;
 import com.codezeng.lms.repository.ReaderRepository;
+import com.codezeng.lms.security.DataScopeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class BorrowService {
     private final FineRecordRepository fineRecordRepository;
     private final OperationLogService operationLogService;
     private final ReservationService reservationService;
+    private final DataScopeService dataScopeService;
     private final I18nMessageService i18n;
 
     public BorrowService(
@@ -39,6 +41,7 @@ public class BorrowService {
             FineRecordRepository fineRecordRepository,
             OperationLogService operationLogService,
             ReservationService reservationService,
+            DataScopeService dataScopeService,
             I18nMessageService i18n) {
         this.bookRepository = bookRepository;
         this.readerRepository = readerRepository;
@@ -46,12 +49,14 @@ public class BorrowService {
         this.fineRecordRepository = fineRecordRepository;
         this.operationLogService = operationLogService;
         this.reservationService = reservationService;
+        this.dataScopeService = dataScopeService;
         this.i18n = i18n;
     }
 
     @Transactional
     public BorrowRecord borrowBook(Long bookId, Long readerId) {
         Book book = bookRepository.findById(bookId).orElseThrow();
+        dataScopeService.requireAccess(book);
         Reader reader = readerRepository.findById(readerId).orElseThrow();
         boolean useLockedReservation = validateBorrow(book, reader);
 
@@ -78,6 +83,7 @@ public class BorrowService {
     @Transactional
     public BorrowRecord returnBook(Long recordId, boolean damaged, boolean lost) {
         BorrowRecord record = borrowRecordRepository.findById(recordId).orElseThrow();
+        dataScopeService.requireAccess(record);
         if (record.getStatus() == BorrowStatus.RETURNED) {
             return record;
         }
@@ -116,6 +122,7 @@ public class BorrowService {
     @Transactional
     public BorrowRecord renew(Long recordId) {
         BorrowRecord record = borrowRecordRepository.findById(recordId).orElseThrow();
+        dataScopeService.requireAccess(record);
         if (record.getStatus() != BorrowStatus.BORROWED) {
             throw new IllegalStateException(i18n.get("error.borrow.onlyBorrowedRenew"));
         }
@@ -136,6 +143,7 @@ public class BorrowService {
     @Transactional
     public void markOverdueRecords() {
         List<BorrowRecord> records = borrowRecordRepository.findByStatusAndDueDateBefore(BorrowStatus.BORROWED, LocalDate.now());
+        records = records.stream().filter(dataScopeService::canAccess).toList();
         for (BorrowRecord record : records) {
             record.setStatus(BorrowStatus.OVERDUE);
             record.setFineAmount(calculateOverdueFine(record));

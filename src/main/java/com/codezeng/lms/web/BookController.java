@@ -67,7 +67,7 @@ public class BookController {
         model.addAttribute("criteria", criteria);
         model.addAttribute("pageSize", pageSize);
         model.addAttribute("categories", categoryRepository.findByDeletedFalseOrderByNameAsc());
-        model.addAttribute("locations", bookRepository.findDistinctLocations());
+        model.addAttribute("locations", visibleLocations());
         model.addAttribute("suggestions", suggestions());
         model.addAttribute("queryString", queryString(criteria, pageSize));
         return "book/list";
@@ -84,7 +84,7 @@ public class BookController {
     @GetMapping("/{id}/edit")
     @PreAuthorize("hasAuthority('BOOK_EDIT')")
     public String edit(@PathVariable Long id, Model model) {
-        model.addAttribute("book", bookRepository.findById(id).orElseThrow());
+        model.addAttribute("book", bookService.getVisible(id));
         model.addAttribute("categories", categoryRepository.findByDeletedFalseOrderByNameAsc());
         return "book/form";
     }
@@ -177,6 +177,14 @@ public class BookController {
             }
         });
         return values.stream().filter(value -> value != null && !value.isBlank()).distinct().limit(20).toList();
+    }
+
+    private List<String> visibleLocations() {
+        return bookRepository.findAll(dataScopeService.bookScope(), Sort.by("location")).stream()
+                .map(Book::getLocation)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .toList();
     }
 
     private String queryString(BookSearchCriteria criteria, int size) {

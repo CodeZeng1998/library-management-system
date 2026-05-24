@@ -52,6 +52,21 @@ public class DatabaseUserDetailsService implements UserDetailsService {
                     .filter(StringUtils::hasText)
                     .collect(Collectors.toCollection(LinkedHashSet::new)));
         }
+        addImpliedPermissions(codes);
         return codes.stream().map(SimpleGrantedAuthority::new).collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private void addImpliedPermissions(Set<String> codes) {
+        if (codes.contains(Permission.BOOK_EDIT.name())
+                || codes.contains(Permission.BOOK_DELETE.name())
+                || codes.contains(Permission.BOOK_IMPORT.name())) {
+            codes.add(Permission.BOOK_VIEW.name());
+        }
+        if (codes.contains(Permission.READER_EDIT.name()) || codes.contains(Permission.READER_DELETE.name())) {
+            codes.add(Permission.READER_VIEW.name());
+        }
+        if (codes.contains(Permission.FINE_PAY.name()) || codes.contains(Permission.FINE_WAIVE.name())) {
+            codes.add(Permission.FINE_VIEW.name());
+        }
     }
 }

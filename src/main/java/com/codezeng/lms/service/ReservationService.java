@@ -7,6 +7,7 @@ import com.codezeng.lms.domain.enums.ReservationStatus;
 import com.codezeng.lms.repository.BookRepository;
 import com.codezeng.lms.repository.ReaderRepository;
 import com.codezeng.lms.repository.ReservationRecordRepository;
+import com.codezeng.lms.security.DataScopeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ public class ReservationService {
     private final ReservationRecordRepository reservationRecordRepository;
     private final OperationLogService operationLogService;
     private final NotificationService notificationService;
+    private final DataScopeService dataScopeService;
     private final I18nMessageService i18n;
 
     public ReservationService(
@@ -30,18 +32,21 @@ public class ReservationService {
             ReservationRecordRepository reservationRecordRepository,
             OperationLogService operationLogService,
             NotificationService notificationService,
+            DataScopeService dataScopeService,
             I18nMessageService i18n) {
         this.bookRepository = bookRepository;
         this.readerRepository = readerRepository;
         this.reservationRecordRepository = reservationRecordRepository;
         this.operationLogService = operationLogService;
         this.notificationService = notificationService;
+        this.dataScopeService = dataScopeService;
         this.i18n = i18n;
     }
 
     @Transactional
     public ReservationRecord reserve(Long bookId, Long readerId) {
         Book book = bookRepository.findById(bookId).orElseThrow();
+        dataScopeService.requireAccess(book);
         Reader reader = readerRepository.findById(readerId).orElseThrow();
         if (book.getAvailableQuantity() > 0) {
             throw new IllegalStateException(i18n.get("error.reservation.inventoryAvailable"));
@@ -132,6 +137,7 @@ public class ReservationService {
     @Transactional
     public void cancel(Long id) {
         ReservationRecord record = reservationRecordRepository.findById(id).orElseThrow();
+        dataScopeService.requireAccess(record);
         record.setStatus(ReservationStatus.CANCELLED);
         reservationRecordRepository.save(record);
         operationLogService.record("预约管理", "取消预约", record.getBook().getTitle());

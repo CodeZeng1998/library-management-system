@@ -1,6 +1,5 @@
 package com.codezeng.lms.config;
 
-import com.codezeng.lms.domain.enums.UserRole;
 import com.codezeng.lms.service.DatabaseUserDetailsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -25,9 +24,15 @@ public class SecurityConfig {
                 .userDetailsService(userDetailsService)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/register", "/h2-console/**").permitAll()
-                        .requestMatchers("/users/**", "/system/**").hasRole(UserRole.SUPER_ADMIN.name())
-                        .requestMatchers("/api/**", "/books/**", "/readers/**", "/borrow/**", "/reservations/**", "/fines/**")
-                        .hasAnyRole(UserRole.SUPER_ADMIN.name(), UserRole.LIBRARIAN.name())
+                        .requestMatchers("/users/**").hasAuthority("USER_MANAGE")
+                        .requestMatchers("/system/configs/**").hasAuthority("CONFIG_MANAGE")
+                        .requestMatchers("/system/logs/**").hasAuthority("LOG_VIEW")
+                        .requestMatchers("/books/**").hasAuthority("BOOK_VIEW")
+                        .requestMatchers("/readers/**").hasAuthority("READER_VIEW")
+                        .requestMatchers("/borrow/**").hasAuthority("BORROW_MANAGE")
+                        .requestMatchers("/reservations/**").hasAuthority("RESERVATION_MANAGE")
+                        .requestMatchers("/notifications/**").hasAuthority("NOTIFICATION_VIEW")
+                        .requestMatchers("/fines/**").hasAuthority("FINE_VIEW")
                         .anyRequest().authenticated()
                 )
                 .formLogin(login -> login

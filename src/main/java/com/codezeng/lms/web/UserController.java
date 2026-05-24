@@ -4,6 +4,7 @@ import com.codezeng.lms.domain.User;
 import com.codezeng.lms.domain.enums.AccountStatus;
 import com.codezeng.lms.domain.enums.UserRole;
 import com.codezeng.lms.repository.UserRepository;
+import com.codezeng.lms.security.Permission;
 import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.OperationLogService;
 import org.springframework.data.domain.PageRequest;
@@ -20,6 +21,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/users")
@@ -62,6 +69,7 @@ public class UserController {
     @PreAuthorize("hasAuthority('USER_MANAGE')")
     public String save(@ModelAttribute User user,
                        @RequestParam(required = false) String rawPassword,
+                       @RequestParam(required = false) List<String> permissionCodes,
                        RedirectAttributes redirectAttributes) {
         User existing = null;
         if (user.getId() != null) {
@@ -74,6 +82,7 @@ public class UserController {
         } else {
             user.setPassword(passwordEncoder.encode(StringUtils.hasText(rawPassword) ? rawPassword : "123456"));
         }
+        user.setPermissionCodes(normalizePermissionCodes(permissionCodes));
         userRepository.save(user);
         operationLogService.record("用户管理", "保存用户", user.getUsername());
         redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.saved"));
@@ -84,5 +93,31 @@ public class UserController {
         model.addAttribute("user", user);
         model.addAttribute("roles", UserRole.values());
         model.addAttribute("accountStatuses", AccountStatus.values());
+        model.addAttribute("permissions", Permission.values());
+        model.addAttribute("selectedPermissionCodes", selectedPermissionCodes(user));
+    }
+
+    private String normalizePermissionCodes(List<String> permissionCodes) {
+        if (permissionCodes == null || permissionCodes.isEmpty()) {
+            return "";
+        }
+        Set<String> allowed = Arrays.stream(Permission.values())
+                .map(Permission::name)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return permissionCodes.stream()
+                .map(String::trim)
+                .filter(allowed::contains)
+                .distinct()
+                .collect(Collectors.joining(","));
+    }
+
+    private Set<String> selectedPermissionCodes(User user) {
+        if (!StringUtils.hasText(user.getPermissionCodes())) {
+            return Set.of();
+        }
+        return Arrays.stream(user.getPermissionCodes().split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 }

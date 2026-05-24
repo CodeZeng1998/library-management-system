@@ -56,6 +56,12 @@ public class BookService {
         return bookRepository.findAll(toSpecification(criteria), pageable);
     }
 
+    public Book getVisible(Long id) {
+        Book book = bookRepository.findById(id).orElseThrow();
+        dataScopeService.requireAccess(book);
+        return book;
+    }
+
     private Specification<Book> toSpecification(BookSearchCriteria criteria) {
         return (root, query, builder) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -170,9 +176,11 @@ public class BookService {
     public Book save(Book book) {
         if (book.getId() != null) {
             Book existing = bookRepository.findById(book.getId()).orElseThrow();
+            dataScopeService.requireAccess(existing);
             book.setCreateTime(existing.getCreateTime());
             book.setDeleted(existing.isDeleted());
         }
+        dataScopeService.requireAccess(book);
         if (book.getAvailableQuantity() > book.getTotalQuantity()) {
             book.setAvailableQuantity(book.getTotalQuantity());
         }
@@ -184,6 +192,7 @@ public class BookService {
     @Transactional
     public void softDelete(Long id) {
         Book book = bookRepository.findById(id).orElseThrow();
+        dataScopeService.requireAccess(book);
         if (book.getAvailableQuantity() < book.getTotalQuantity()) {
             throw new IllegalStateException(i18n.get("error.book.hasActiveBorrows"));
         }

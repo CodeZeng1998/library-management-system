@@ -37,6 +37,23 @@
                             <option th:each="status : ${accountStatuses}" th:value="${status}" th:text="${#messages.msg('status.' + status.name())}"></option>
                         </select>
                     </div>
+                    <div class="form-full">
+                        <label>Managed location prefix</label>
+                        <input class="layui-input" th:field="*{managedLocationPrefix}" placeholder="For branch librarians, for example: Main Library or Branch A">
+                    </div>
+                    <div class="form-full">
+                        <label>Additional permissions</label>
+                        <div class="permission-checks">
+                            <label th:each="permission : ${permissions}">
+                                <input type="checkbox"
+                                       name="permissionCodes"
+                                       th:value="${permission.name()}"
+                                       th:checked="${selectedPermissionCodes.contains(permission.name())}">
+                                <span th:text="${permission.label}">Permission</span>
+                                <em th:text="${permission.name()}">CODE</em>
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div style="margin-top: 18px;">
                     <button class="layui-btn" type="submit" th:text="#{common.save}">保存</button>
