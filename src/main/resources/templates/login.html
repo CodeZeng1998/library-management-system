@@ -20,15 +20,15 @@
     <form class="layui-form" th:action="@{/login}" method="post" style="margin-top: 22px;">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <div class="layui-form-item">
-            <label class="layui-form-label" th:text="#{login.username}">账号</label>
+            <label class="layui-form-label" for="username" th:text="#{login.username}">账号</label>
             <div class="layui-input-block">
-                <input class="layui-input" name="username" autocomplete="username" required>
+                <input id="username" class="layui-input" name="username" autocomplete="username" required>
             </div>
         </div>
         <div class="layui-form-item">
-            <label class="layui-form-label" th:text="#{login.password}">密码</label>
+            <label class="layui-form-label" for="password" th:text="#{login.password}">密码</label>
             <div class="layui-input-block">
-                <input class="layui-input" name="password" type="password" autocomplete="current-password" required>
+                <input id="password" class="layui-input" name="password" type="password" autocomplete="current-password" required>
             </div>
         </div>
         <div class="layui-form-item">

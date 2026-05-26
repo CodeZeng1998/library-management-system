@@ -17,6 +17,13 @@ public interface ReservationRecordRepository extends JpaRepository<ReservationRe
 
     long countByBookAndStatus(Book book, ReservationStatus status);
 
+    long countByBookAndStatusAndReservedAtBefore(Book book, ReservationStatus status, LocalDateTime reservedAt);
+
+    long countByStatusIn(Collection<ReservationStatus> statuses);
+
+    boolean existsByBookAndReaderAndStatusIn(
+            Book book, com.codezeng.lms.domain.Reader reader, Collection<ReservationStatus> statuses);
+
     List<ReservationRecord> findByBookAndStatusOrderByReservedAtAsc(Book book, ReservationStatus status);
 
     List<ReservationRecord> findByReaderAndDeletedFalseOrderByReservedAtDesc(com.codezeng.lms.domain.Reader reader);

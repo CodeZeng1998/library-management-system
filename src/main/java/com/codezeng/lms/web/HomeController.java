@@ -4,11 +4,13 @@ import com.codezeng.lms.domain.Book;
 import com.codezeng.lms.domain.BorrowRecord;
 import com.codezeng.lms.domain.Reader;
 import com.codezeng.lms.domain.enums.BorrowStatus;
+import com.codezeng.lms.domain.enums.ReservationStatus;
 import com.codezeng.lms.repository.BookRepository;
 import com.codezeng.lms.repository.BorrowRecordRepository;
 import com.codezeng.lms.repository.ReaderRepository;
 import com.codezeng.lms.repository.ReservationRecordRepository;
 import com.codezeng.lms.security.DataScopeService;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Controller;
@@ -53,43 +55,62 @@ public class HomeController {
 
     @GetMapping("/")
     public String index(Model model) {
-        List<Book> visibleBooks = bookRepository.findAll(dataScopeService.bookScope());
-        List<BorrowRecord> visibleRecords = borrowRecordRepository.findAll(dataScopeService.borrowRecordScope());
-        long activeBorrowCount = visibleRecords.stream()
-                .filter(record -> record.getStatus() == BorrowStatus.BORROWED || record.getStatus() == BorrowStatus.OVERDUE)
-                .count();
-        List<BorrowRecord> overdueRecords = visibleRecords.stream()
-                .filter(record -> record.getStatus() == BorrowStatus.OVERDUE
-                        || (record.getStatus() == BorrowStatus.BORROWED && record.getDueDate().isBefore(LocalDate.now())))
-                .sorted(Comparator.comparing(BorrowRecord::getDueDate))
-                .limit(8)
-                .toList();
+        List<Book> heatmapBooks = bookRepository.findAll(
+                dataScopeService.bookScope(),
+                PageRequest.of(0, 120, Sort.by(Sort.Direction.DESC, "borrowCount"))).getContent();
+        List<BorrowRecord> recentRecords = recentDashboardRecords();
+        long activeBorrowCount = borrowRecordRepository.count(activeBorrowSpec());
+        List<BorrowRecord> overdueRecords = borrowRecordRepository
+                .findAll(overdueSpec(), PageRequest.of(0, 8, Sort.by("dueDate"))).getContent();
 
-        model.addAttribute("bookCount", visibleBooks.size());
+        model.addAttribute("bookCount", bookRepository.count(dataScopeService.bookScope()));
         model.addAttribute("readerCount", readerRepository.countByDeletedFalse());
         model.addAttribute("activeBorrowCount", activeBorrowCount);
-        model.addAttribute("reservationCount", reservationRecordRepository.count(dataScopeService.reservationScope()));
-        model.addAttribute("topBooks", visibleBooks.stream()
-                .sorted(Comparator.comparingLong(Book::getBorrowCount).reversed())
-                .limit(8)
-                .toList());
+        model.addAttribute("reservationCount", reservationRecordRepository.count(dataScopeService.reservationScope()
+                .and((root, query, builder) -> root.get("status").in(List.of(ReservationStatus.WAITING, ReservationStatus.NOTIFIED)))));
+        model.addAttribute("topBooks", bookRepository.findAll(
+                dataScopeService.bookScope(),
+                PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "borrowCount"))).getContent());
         model.addAttribute("recentBooks", bookRepository.findAll(dataScopeService.bookScope(), PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "createTime"))).getContent());
         model.addAttribute("overdueRecords", overdueRecords);
-        model.addAttribute("borrowTrend", borrowTrend(visibleRecords));
-        model.addAttribute("borrowTrendDaily", borrowTrendByDay(visibleRecords));
-        model.addAttribute("borrowTrendWeekly", borrowTrendByWeek(visibleRecords));
-        model.addAttribute("borrowTrendMonthly", borrowTrendByMonth(visibleRecords));
-        model.addAttribute("categoryShare", categoryShare(visibleBooks, visibleRecords));
-        model.addAttribute("shelfHeatmap", shelfHeatmap(visibleBooks, visibleRecords));
-        model.addAttribute("readerActivity", readerActivityDistribution(visibleRecords));
-        model.addAttribute("overdueRateTrend", overdueRateTrend(visibleRecords));
-        model.addAttribute("newBookImpact", newBookImpact(visibleBooks, visibleRecords));
+        model.addAttribute("borrowTrend", borrowTrend(recentRecords));
+        model.addAttribute("borrowTrendDaily", borrowTrendByDay(recentRecords));
+        model.addAttribute("borrowTrendWeekly", borrowTrendByWeek(recentRecords));
+        model.addAttribute("borrowTrendMonthly", borrowTrendByMonth(recentRecords));
+        model.addAttribute("categoryShare", categoryShare(heatmapBooks, recentRecords));
+        model.addAttribute("shelfHeatmap", shelfHeatmap(heatmapBooks, recentRecords));
+        model.addAttribute("readerActivity", readerActivityDistribution(recentRecords));
+        model.addAttribute("overdueRateTrend", overdueRateTrend(recentRecords));
+        model.addAttribute("newBookImpact", newBookImpact(heatmapBooks, recentRecords));
         return "index";
     }
 
     @GetMapping("/login")
     public String login() {
         return "login";
+    }
+
+    private List<BorrowRecord> recentDashboardRecords() {
+        LocalDate start = LocalDate.now().minusMonths(6);
+        Specification<BorrowRecord> spec = dataScopeService.borrowRecordScope()
+                .and((root, query, builder) -> builder.or(
+                        builder.greaterThanOrEqualTo(root.get("borrowDate"), start),
+                        builder.greaterThanOrEqualTo(root.get("dueDate"), LocalDate.now().minusDays(30))));
+        return borrowRecordRepository.findAll(spec, PageRequest.of(0, 2000, Sort.by(Sort.Direction.DESC, "borrowDate"))).getContent();
+    }
+
+    private Specification<BorrowRecord> activeBorrowSpec() {
+        return dataScopeService.borrowRecordScope()
+                .and((root, query, builder) -> root.get("status").in(List.of(BorrowStatus.BORROWED, BorrowStatus.OVERDUE)));
+    }
+
+    private Specification<BorrowRecord> overdueSpec() {
+        return dataScopeService.borrowRecordScope()
+                .and((root, query, builder) -> builder.or(
+                        builder.equal(root.get("status"), BorrowStatus.OVERDUE),
+                        builder.and(
+                                builder.equal(root.get("status"), BorrowStatus.BORROWED),
+                                builder.lessThan(root.get("dueDate"), LocalDate.now()))));
     }
 
     private List<DashboardPoint> borrowTrend(List<BorrowRecord> records) {

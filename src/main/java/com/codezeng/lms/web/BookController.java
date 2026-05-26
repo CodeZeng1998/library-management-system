@@ -8,6 +8,7 @@ import com.codezeng.lms.service.BookSearchCriteria;
 import com.codezeng.lms.service.BookService;
 import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.ImportResult;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -63,6 +64,7 @@ public class BookController {
     public String list(BookSearchCriteria criteria,
                        @RequestParam(defaultValue = "0") int page,
                        @RequestParam(defaultValue = "30") int size,
+                       HttpServletRequest request,
                        Model model) {
         normalizeCriteria(criteria);
         int pageSize = normalizedPageSize(size);
@@ -74,6 +76,7 @@ public class BookController {
         model.addAttribute("locations", visibleLocations());
         model.addAttribute("suggestions", suggestions());
         model.addAttribute("queryString", queryString(criteria, pageSize));
+        model.addAttribute("currentUrl", currentUrl(request));
         return "book/list";
     }
 
@@ -292,5 +295,10 @@ public class BookController {
         if (!text.isBlank()) {
             builder.queryParam(name, text);
         }
+    }
+
+    private String currentUrl(HttpServletRequest request) {
+        String query = request.getQueryString();
+        return request.getRequestURI() + (query == null || query.isBlank() ? "" : "?" + query);
     }
 }

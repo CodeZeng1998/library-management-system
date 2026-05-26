@@ -1,6 +1,7 @@
 package com.codezeng.lms.repository;
 
 import com.codezeng.lms.domain.BorrowRecord;
+import com.codezeng.lms.domain.Book;
 import com.codezeng.lms.domain.Reader;
 import com.codezeng.lms.domain.enums.BorrowStatus;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,8 @@ public interface BorrowRecordRepository extends JpaRepository<BorrowRecord, Long
     List<BorrowRecord> findByReaderAndDeletedFalseOrderByBorrowDateDesc(Reader reader);
 
     boolean existsByReaderAndStatusAndDueDateBefore(Reader reader, BorrowStatus status, LocalDate date);
+
+    boolean existsByBookAndReaderAndStatusIn(Book book, Reader reader, Collection<BorrowStatus> statuses);
 
     long countByStatusIn(Collection<BorrowStatus> statuses);
 

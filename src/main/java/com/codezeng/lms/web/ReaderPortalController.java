@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -69,14 +70,16 @@ public class ReaderPortalController {
     }
 
     @PostMapping("/books/{id}/reserve")
-    public String reserveBook(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+    public String reserveBook(@PathVariable Long id,
+                              @RequestParam(defaultValue = "/books") String redirect,
+                              RedirectAttributes redirectAttributes) {
         try {
             reservationService.reserve(id, readerPortalService.requireCurrentReader().getId());
             redirectAttributes.addFlashAttribute("message", i18n.get("flash.reservation.created"));
         } catch (IllegalStateException ex) {
             redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }
-        return "redirect:/recommendations";
+        return "redirect:" + safeRedirect(redirect);
     }
 
     @PostMapping("/fines/{id}/pay")
@@ -93,5 +96,12 @@ public class ReaderPortalController {
         notificationService.markRead(id);
         redirectAttributes.addFlashAttribute("message", i18n.get("flash.notification.read"));
         return "redirect:/portal";
+    }
+
+    private String safeRedirect(String redirect) {
+        if (redirect == null || redirect.isBlank() || !redirect.startsWith("/") || redirect.startsWith("//")) {
+            return "/books";
+        }
+        return redirect;
     }
 }

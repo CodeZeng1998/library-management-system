@@ -156,7 +156,15 @@
                         </div>
                         <div class="availability" th:classappend="${book.availableQuantity > 0 ? ' available' : ' unavailable'}" th:text="${book.availableQuantity > 0 ? #messages.msg('book.available', book.availableQuantity, book.totalQuantity) : #messages.msg('book.unavailable')}"></div>
                         <div class="book-location" th:text="${book.location ?: #messages.msg('book.locationUnknown')}"></div>
-                        <a class="layui-btn layui-btn-xs" th:href="@{/books/{id}/edit(id=${book.id})}" sec:authorize="hasAuthority('BOOK_EDIT')" th:text="#{common.edit}">编辑</a>
+                        <div class="book-actions">
+                            <span class="status-pill" sec:authorize="hasAuthority('ROLE_READER')" th:if="${book.availableQuantity > 0}" th:text="#{book.walkInBorrow}">到馆借阅</span>
+                            <form sec:authorize="hasAuthority('ROLE_READER')" th:if="${book.availableQuantity <= 0}" th:action="@{/portal/books/{id}/reserve(id=${book.id})}" method="post">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <input type="hidden" name="redirect" th:value="${currentUrl}">
+                                <button class="layui-btn layui-btn-xs" type="submit" th:text="#{book.reserveNow}">立即预约</button>
+                            </form>
+                            <a class="layui-btn layui-btn-xs" th:href="@{/books/{id}/edit(id=${book.id})}" sec:authorize="hasAuthority('BOOK_EDIT')" th:text="#{common.edit}">编辑</a>
+                        </div>
                     </div>
                 </article>
             </div>
@@ -173,6 +181,12 @@
                     <td th:text="${book.availableQuantity + '/' + book.totalQuantity}"></td>
                     <td th:text="${book.location}"></td>
                     <td class="table-actions">
+                        <span class="status-pill" sec:authorize="hasAuthority('ROLE_READER')" th:if="${book.availableQuantity > 0}" th:text="#{book.walkInBorrow}">到馆借阅</span>
+                        <form sec:authorize="hasAuthority('ROLE_READER')" th:if="${book.availableQuantity <= 0}" th:action="@{/portal/books/{id}/reserve(id=${book.id})}" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <input type="hidden" name="redirect" th:value="${currentUrl}">
+                            <button class="layui-btn layui-btn-xs" type="submit" th:text="#{book.reserveNow}">立即预约</button>
+                        </form>
                         <a class="layui-btn layui-btn-xs" th:href="@{/books/{id}/edit(id=${book.id})}" sec:authorize="hasAuthority('BOOK_EDIT')" th:text="#{common.edit}">编辑</a>
                         <form th:action="@{/books/{id}/delete(id=${book.id})}" method="post" th:attr="onsubmit=|return confirm('#{book.confirmDelete}')|" sec:authorize="hasAuthority('BOOK_DELETE')">
                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
@@ -202,7 +216,15 @@
                             <div><dt th:text="#{book.location}">馆藏地</dt><dd th:text="${book.location ?: '-'}"></dd></div>
                         </dl>
                         <p class="book-summary" th:text="${book.summary ?: #messages.msg('book.noSummary')}"></p>
-                        <a class="layui-btn layui-btn-xs" th:href="@{/books/{id}/edit(id=${book.id})}" sec:authorize="hasAuthority('BOOK_EDIT')" th:text="#{common.edit}">编辑</a>
+                        <div class="book-actions">
+                            <span class="status-pill" sec:authorize="hasAuthority('ROLE_READER')" th:if="${book.availableQuantity > 0}" th:text="#{book.walkInBorrow}">到馆借阅</span>
+                            <form sec:authorize="hasAuthority('ROLE_READER')" th:if="${book.availableQuantity <= 0}" th:action="@{/portal/books/{id}/reserve(id=${book.id})}" method="post">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <input type="hidden" name="redirect" th:value="${currentUrl}">
+                                <button class="layui-btn layui-btn-xs" type="submit" th:text="#{book.reserveNow}">立即预约</button>
+                            </form>
+                            <a class="layui-btn layui-btn-xs" th:href="@{/books/{id}/edit(id=${book.id})}" sec:authorize="hasAuthority('BOOK_EDIT')" th:text="#{common.edit}">编辑</a>
+                        </div>
                     </div>
                 </article>
             </div>

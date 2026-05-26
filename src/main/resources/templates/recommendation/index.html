@@ -68,6 +68,7 @@
                                 <a class="layui-btn layui-btn-xs layui-btn-primary" th:href="@{/books(keyword=${item.book().isbn})}" th:text="#{portal.viewBook}">View</a>
                                 <form sec:authorize="hasAuthority('ROLE_READER')" th:if="${item.book().availableQuantity <= 0}" th:action="@{/portal/books/{id}/reserve(id=${item.book().id})}" method="post">
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                    <input type="hidden" name="redirect" value="/recommendations">
                                     <button class="layui-btn layui-btn-xs" type="submit" th:text="#{recommendation.reserveNow}">Reserve</button>
                                 </form>
                             </div>

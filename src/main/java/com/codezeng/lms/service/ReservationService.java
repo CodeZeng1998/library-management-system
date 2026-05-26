@@ -3,8 +3,11 @@ package com.codezeng.lms.service;
 import com.codezeng.lms.domain.Book;
 import com.codezeng.lms.domain.Reader;
 import com.codezeng.lms.domain.ReservationRecord;
+import com.codezeng.lms.domain.enums.AccountStatus;
+import com.codezeng.lms.domain.enums.BorrowStatus;
 import com.codezeng.lms.domain.enums.ReservationStatus;
 import com.codezeng.lms.repository.BookRepository;
+import com.codezeng.lms.repository.BorrowRecordRepository;
 import com.codezeng.lms.repository.ReaderRepository;
 import com.codezeng.lms.repository.ReservationRecordRepository;
 import com.codezeng.lms.security.DataScopeService;
@@ -21,6 +24,7 @@ public class ReservationService {
     private final BookRepository bookRepository;
     private final ReaderRepository readerRepository;
     private final ReservationRecordRepository reservationRecordRepository;
+    private final BorrowRecordRepository borrowRecordRepository;
     private final OperationLogService operationLogService;
     private final NotificationService notificationService;
     private final DataScopeService dataScopeService;
@@ -30,6 +34,7 @@ public class ReservationService {
             BookRepository bookRepository,
             ReaderRepository readerRepository,
             ReservationRecordRepository reservationRecordRepository,
+            BorrowRecordRepository borrowRecordRepository,
             OperationLogService operationLogService,
             NotificationService notificationService,
             DataScopeService dataScopeService,
@@ -37,6 +42,7 @@ public class ReservationService {
         this.bookRepository = bookRepository;
         this.readerRepository = readerRepository;
         this.reservationRecordRepository = reservationRecordRepository;
+        this.borrowRecordRepository = borrowRecordRepository;
         this.operationLogService = operationLogService;
         this.notificationService = notificationService;
         this.dataScopeService = dataScopeService;
@@ -48,8 +54,25 @@ public class ReservationService {
         Book book = bookRepository.findById(bookId).orElseThrow();
         dataScopeService.requireAccess(book);
         Reader reader = readerRepository.findById(readerId).orElseThrow();
+        if (book.isDeleted() || reader.isDeleted()) {
+            throw new IllegalStateException(i18n.get("error.borrow.bookOrReaderNotFound"));
+        }
+        if (reader.getStatus() != AccountStatus.NORMAL) {
+            throw new IllegalStateException(i18n.get("error.borrow.accountStatus"));
+        }
         if (book.getAvailableQuantity() > 0) {
             throw new IllegalStateException(i18n.get("error.reservation.inventoryAvailable"));
+        }
+        if (book.isReferenceOnly()) {
+            throw new IllegalStateException(i18n.get("error.borrow.referenceOnly"));
+        }
+        if (borrowRecordRepository.existsByBookAndReaderAndStatusIn(
+                book, reader, List.of(BorrowStatus.BORROWED, BorrowStatus.OVERDUE))) {
+            throw new IllegalStateException(i18n.get("error.reservation.alreadyBorrowed"));
+        }
+        if (reservationRecordRepository.existsByBookAndReaderAndStatusIn(
+                book, reader, List.of(ReservationStatus.WAITING, ReservationStatus.NOTIFIED))) {
+            throw new IllegalStateException(i18n.get("error.reservation.duplicate"));
         }
         long queueSize = reservationRecordRepository.countByBookAndStatus(book, ReservationStatus.WAITING);
         if (queueSize >= 5) {
@@ -138,8 +161,18 @@ public class ReservationService {
     public void cancel(Long id) {
         ReservationRecord record = reservationRecordRepository.findById(id).orElseThrow();
         dataScopeService.requireAccess(record);
+        if (record.getStatus() != ReservationStatus.WAITING && record.getStatus() != ReservationStatus.NOTIFIED) {
+            return;
+        }
+        boolean releaseLockedCopy = record.getStatus() == ReservationStatus.NOTIFIED;
         record.setStatus(ReservationStatus.CANCELLED);
         reservationRecordRepository.save(record);
+        if (releaseLockedCopy) {
+            Book book = record.getBook();
+            book.setAvailableQuantity(Math.min(book.getAvailableQuantity() + 1, book.getTotalQuantity()));
+            bookRepository.save(book);
+            lockNextReservation(book);
+        }
         operationLogService.record("预约管理", "取消预约", record.getBook().getTitle());
     }
 
