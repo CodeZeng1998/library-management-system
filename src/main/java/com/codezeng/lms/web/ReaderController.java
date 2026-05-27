@@ -5,6 +5,7 @@ import com.codezeng.lms.domain.enums.AccountStatus;
 import com.codezeng.lms.domain.enums.MemberLevel;
 import com.codezeng.lms.domain.enums.ReaderType;
 import com.codezeng.lms.repository.ReaderRepository;
+import com.codezeng.lms.service.CsvImportGuard;
 import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.ImportResult;
 import com.codezeng.lms.service.ReaderService;
@@ -38,11 +39,16 @@ public class ReaderController {
 
     private final ReaderRepository readerRepository;
     private final ReaderService readerService;
+    private final CsvImportGuard csvImportGuard;
     private final I18nMessageService i18n;
 
-    public ReaderController(ReaderRepository readerRepository, ReaderService readerService, I18nMessageService i18n) {
+    public ReaderController(ReaderRepository readerRepository,
+                            ReaderService readerService,
+                            CsvImportGuard csvImportGuard,
+                            I18nMessageService i18n) {
         this.readerRepository = readerRepository;
         this.readerService = readerService;
+        this.csvImportGuard = csvImportGuard;
         this.i18n = i18n;
     }
 
@@ -95,11 +101,14 @@ public class ReaderController {
                             HttpSession session,
                             RedirectAttributes redirectAttributes) {
         try {
+            csvImportGuard.validate(file);
             ImportResult result = readerService.importCsv(file);
             rememberErrorReport(session, READER_IMPORT_ERRORS, result);
             redirectAttributes.addFlashAttribute(result.getFailureCount() == 0 ? "message" : "error", result.toMessage());
         } catch (IOException ex) {
             redirectAttributes.addFlashAttribute("error", i18n.get("flash.import.failed", ex.getMessage()));
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/readers";
     }
@@ -111,6 +120,7 @@ public class ReaderController {
                                 Model model,
                                 RedirectAttributes redirectAttributes) {
         try {
+            csvImportGuard.validate(file);
             session.setAttribute(READER_IMPORT_BYTES, file.getBytes());
             ImportResult result = readerService.previewCsv(file);
             rememberErrorReport(session, READER_IMPORT_ERRORS, result);
@@ -123,6 +133,9 @@ public class ReaderController {
             return "import/preview";
         } catch (IOException ex) {
             redirectAttributes.addFlashAttribute("error", i18n.get("flash.import.failed", ex.getMessage()));
+            return "redirect:/readers";
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
             return "redirect:/readers";
         }
     }

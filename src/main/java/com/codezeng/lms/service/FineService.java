@@ -28,6 +28,9 @@ public class FineService {
     public void pay(Long id) {
         FineRecord fine = fineRecordRepository.findById(id).orElseThrow();
         dataScopeService.requireAccess(fine);
+        if (fine.getStatus() != FineStatus.UNPAID) {
+            return;
+        }
         fine.setStatus(FineStatus.PAID);
         fine.setPaidAt(LocalDateTime.now());
         fineRecordRepository.save(fine);
@@ -38,6 +41,9 @@ public class FineService {
     public void waive(Long id) {
         FineRecord fine = fineRecordRepository.findById(id).orElseThrow();
         dataScopeService.requireAccess(fine);
+        if (fine.getStatus() != FineStatus.UNPAID) {
+            return;
+        }
         fine.setStatus(FineStatus.WAIVED);
         fineRecordRepository.save(fine);
         operationLogService.record("罚款管理", "减免罚款", fine.getReader().getReaderNo() + " " + fine.getAmount());

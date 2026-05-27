@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
-<body>
+<body th:data-notification-empty="#{notification.batch.empty}">
 <div class="app-shell">
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
@@ -20,14 +20,24 @@
         <div th:replace="~{fragments/alerts :: alerts}"></div>
 
         <section class="panel notification-center">
-            <div class="notification-tabs" role="tablist" th:attr="aria-label=#{notification.filter}">
-                <a th:classappend="${status == null ? 'active' : ''}" th:href="@{/notifications}" th:text="#{common.all}">All</a>
-                <a th:classappend="${status != null and status.name() == 'UNREAD' ? 'active' : ''}" th:href="@{/notifications(status='UNREAD')}" th:text="#{notificationStatus.UNREAD}">Unread</a>
-                <a th:classappend="${status != null and status.name() == 'READ' ? 'active' : ''}" th:href="@{/notifications(status='READ')}" th:text="#{notificationStatus.READ}">Read</a>
+            <div class="table-toolbar">
+                <div class="notification-tabs" role="tablist" th:attr="aria-label=#{notification.filter}">
+                    <a th:classappend="${status == null ? 'active' : ''}" th:href="@{/notifications(keyword=${keyword})}" th:text="#{common.all}">All</a>
+                    <a th:classappend="${status != null and status.name() == 'UNREAD' ? 'active' : ''}" th:href="@{/notifications(status='UNREAD', keyword=${keyword})}" th:text="#{notificationStatus.UNREAD}">Unread</a>
+                    <a th:classappend="${status != null and status.name() == 'READ' ? 'active' : ''}" th:href="@{/notifications(status='READ', keyword=${keyword})}" th:text="#{notificationStatus.READ}">Read</a>
+                </div>
+                <form class="notification-filter" th:action="@{/notifications}" method="get">
+                    <input type="hidden" name="status" th:value="${status}">
+                    <input class="layui-input" name="keyword" th:value="${keyword}" th:placeholder="#{notification.keyword.placeholder}">
+                    <button class="layui-btn" type="submit" th:text="#{common.search}">Search</button>
+                    <a class="layui-btn layui-btn-primary" th:href="@{/notifications}" th:text="#{common.reset}">Reset</a>
+                </form>
             </div>
 
             <form id="notificationBatchForm" th:action="@{/notifications/batch}" method="post">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <input type="hidden" name="status" th:value="${status}">
+                <input type="hidden" name="keyword" th:value="${keyword}">
             </form>
             <div class="notification-actions">
                 <label class="select-all">
@@ -68,12 +78,12 @@
             <div class="table-actions">
                 <a class="layui-btn layui-btn-sm layui-btn-primary"
                    th:if="${notifications.hasPrevious()}"
-                   th:href="@{/notifications(page=${notifications.number - 1}, status=${status})}"
+                   th:href="@{|/notifications?page=${notifications.number - 1}${queryString}|}"
                    th:text="#{common.previous}">Previous</a>
                 <span th:text="|${notifications.number + 1} / ${notifications.totalPages == 0 ? 1 : notifications.totalPages}|"></span>
                 <a class="layui-btn layui-btn-sm layui-btn-primary"
                    th:if="${notifications.hasNext()}"
-                   th:href="@{/notifications(page=${notifications.number + 1}, status=${status})}"
+                   th:href="@{|/notifications?page=${notifications.number + 1}${queryString}|}"
                    th:text="#{common.next}">Next</a>
             </div>
         </section>

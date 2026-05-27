@@ -156,7 +156,11 @@
                     <td data-cell="borrowDate" th:text="${record.borrowDate}"></td>
                     <td data-cell="dueDate" th:text="${record.dueDate}"></td>
                     <td data-cell="returnDate" th:text="${record.returnDate ?: '-'}"></td>
-                    <td data-cell="status" th:text="${#messages.msg('borrowStatus.' + record.status.name())}"></td>
+                    <td data-cell="status">
+                        <span class="status-chip"
+                              th:classappend="${' status-' + record.status.name().toLowerCase()}"
+                              th:text="${#messages.msg('borrowStatus.' + record.status.name())}">Status</span>
+                    </td>
                     <td data-cell="fine" th:text="${record.fineAmount}"></td>
                     <td class="table-actions" data-cell="actions">
                         <button th:if="${record.status.name() == 'BORROWED'}"

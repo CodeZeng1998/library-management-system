@@ -6,12 +6,17 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "sys_user")
+@Table(name = "sys_user", indexes = {
+        @Index(name = "idx_user_deleted_status", columnList = "deleted,status"),
+        @Index(name = "idx_user_deleted_role", columnList = "deleted,role"),
+        @Index(name = "idx_user_reader_no", columnList = "reader_no")
+})
 public class User extends BaseEntity {
 
     @Column(nullable = false, unique = true, length = 64)

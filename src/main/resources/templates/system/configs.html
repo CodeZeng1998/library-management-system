@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="|#{system.config.title} - #{app.name}|">系统配置 - 图书管理系统</title>
+    <title th:text="|#{system.config.title} - #{app.name}|">System Config - Library Management System</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -12,29 +12,60 @@
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
         <div class="topbar">
-            <h1 class="page-title" th:text="#{system.config.title}">系统配置</h1>
+            <div>
+                <h1 class="page-title" th:text="#{system.config.title}">System Config</h1>
+                <p class="portal-subtitle" th:text="#{system.config.subtitle}">Runtime policy and circulation settings</p>
+            </div>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
+
         <section class="panel">
-            <table class="layui-table">
-                <thead><tr><th th:text="#{system.config.name}">配置项</th><th th:text="#{system.config.key}">键</th><th th:text="#{common.value}">值</th><th th:text="#{common.description}">说明</th><th th:text="#{common.operation}">操作</th></tr></thead>
+            <div class="table-toolbar">
+                <div>
+                    <h2 class="section-title" th:text="#{system.config.settingsCenter}">Settings Center</h2>
+                    <span class="hint" th:text="#{system.config.keyword.placeholder}">Config key / name / description</span>
+                </div>
+                <form class="notification-filter" th:action="@{/system/configs}" method="get">
+                    <input class="layui-input" name="keyword" th:value="${keyword}" th:placeholder="#{system.config.keyword.placeholder}">
+                    <button class="layui-btn" type="submit" th:text="#{common.search}">Search</button>
+                    <a class="layui-btn layui-btn-primary" th:href="@{/system/configs}" th:text="#{common.reset}">Reset</a>
+                </form>
+            </div>
+
+            <table class="layui-table responsive-table">
+                <thead>
+                <tr>
+                    <th th:text="#{system.config.name}">Name</th>
+                    <th th:text="#{system.config.key}">Key</th>
+                    <th th:text="#{common.value}">Value</th>
+                    <th th:text="#{common.description}">Description</th>
+                    <th th:text="#{common.operation}">Actions</th>
+                </tr>
+                </thead>
                 <tbody>
                 <tr th:each="config : ${configs}">
-                    <td th:text="${config.displayName}"></td>
-                    <td th:text="${config.configKey}"></td>
                     <td>
-                        <form class="table-actions" th:action="@{/system/configs}" method="post">
+                        <strong th:text="${config.displayName}">Config</strong>
+                    </td>
+                    <td><code th:text="${config.configKey}">key</code></td>
+                    <td>
+                        <form class="config-inline-form" th:action="@{/system/configs}" method="post" th:attr="onsubmit=|return confirm('#{system.config.confirmUpdate}')|">
                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                             <input type="hidden" name="id" th:value="${config.id}">
-                            <input class="layui-input" style="width: 160px;" name="configValue" th:value="${config.configValue}">
-                            <button class="layui-btn layui-btn-xs" type="submit" th:text="#{common.save}">保存</button>
+                            <input type="hidden" name="keyword" th:value="${keyword}">
+                            <input class="layui-input" name="configValue" th:value="${config.configValue}" required>
+                            <button class="layui-btn layui-btn-xs" type="submit" th:text="#{common.save}">Save</button>
                         </form>
+                        <small class="config-rule"
+                               th:if="${validationHints[config.configKey] != null}"
+                               th:text="|Rule: ${validationHints[config.configKey]}|">Rule</small>
                     </td>
-                    <td th:text="${config.description}"></td>
-                    <td></td>
+                    <td th:text="${config.description ?: '-'}">Description</td>
+                    <td><span class="status-chip status-normal" th:text="#{system.config.auditEnabled}">Audited</span></td>
                 </tr>
                 </tbody>
             </table>
+            <div class="empty-result" th:if="${#lists.isEmpty(configs)}" th:text="#{system.config.empty}">No configs found.</div>
         </section>
     </main>
 </div>

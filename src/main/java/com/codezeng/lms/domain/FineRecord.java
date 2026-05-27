@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
@@ -12,7 +13,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "fine_record")
+@Table(name = "fine_record", indexes = {
+        @Index(name = "idx_fine_deleted_status_created", columnList = "deleted,status,create_time"),
+        @Index(name = "idx_fine_reader_deleted_created", columnList = "reader_id,deleted,create_time"),
+        @Index(name = "idx_fine_borrow_status", columnList = "borrow_record_id,status")
+})
 public class FineRecord extends BaseEntity {
 
     @ManyToOne(optional = false)

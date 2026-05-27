@@ -5,13 +5,18 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "reservation_record")
+@Table(name = "reservation_record", indexes = {
+        @Index(name = "idx_reservation_deleted_status_expires", columnList = "deleted,status,expires_at"),
+        @Index(name = "idx_reservation_book_status_reserved", columnList = "book_id,status,reserved_at"),
+        @Index(name = "idx_reservation_reader_deleted_reserved", columnList = "reader_id,deleted,reserved_at")
+})
 public class ReservationRecord extends BaseEntity {
 
     @ManyToOne(optional = false)

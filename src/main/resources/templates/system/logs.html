@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="|#{system.logs.title} - #{app.name}|">操作日志 - 图书管理系统</title>
+    <title th:text="|#{system.logs.title} - #{app.name}|">Operation Logs - Library Management System</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -12,25 +12,53 @@
     <div th:replace="~{fragments/nav :: sidebar}"></div>
     <main class="content">
         <div class="topbar">
-            <h1 class="page-title" th:text="#{system.logs.title}">操作日志</h1>
+            <h1 class="page-title" th:text="#{system.logs.title}">Operation Logs</h1>
+            <a class="layui-btn layui-btn-primary"
+               th:href="@{/system/logs/export(keyword=${keyword}, module=${module}, ip=${ip})}"
+               th:text="#{common.exportCsv}">Export CSV</a>
         </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
         <section class="panel">
-            <table class="layui-table">
-                <thead><tr><th th:text="#{common.time}">时间</th><th th:text="#{system.logs.user}">用户</th><th th:text="#{system.logs.module}">模块</th><th th:text="#{system.logs.operation}">操作</th><th th:text="#{common.detail}">详情</th></tr></thead>
+            <div class="table-toolbar">
+                <div>
+                    <h2 class="section-title" th:text="#{system.logs.auditTrail}">Audit Trail</h2>
+                    <span class="hint" th:text="#{system.logs.keyword.placeholder}">User / module / operation / detail</span>
+                </div>
+                <form class="admin-filter" th:action="@{/system/logs}" method="get">
+                    <input class="layui-input" name="module" th:value="${module}" th:placeholder="#{system.logs.module}">
+                    <input class="layui-input" name="ip" th:value="${ip}" th:placeholder="#{system.logs.ip}">
+                    <input class="layui-input" name="keyword" th:value="${keyword}" th:placeholder="#{system.logs.keyword.placeholder}">
+                    <button class="layui-btn" type="submit" th:text="#{common.search}">Search</button>
+                    <a class="layui-btn layui-btn-primary" th:href="@{/system/logs}" th:text="#{common.reset}">Reset</a>
+                </form>
+            </div>
+            <table class="layui-table responsive-table">
+                <thead>
+                <tr>
+                    <th th:text="#{common.time}">Time</th>
+                    <th th:text="#{system.logs.user}">User</th>
+                    <th th:text="#{system.logs.module}">Module</th>
+                    <th th:text="#{system.logs.operation}">Operation</th>
+                    <th th:text="#{system.logs.ip}">IP</th>
+                    <th th:text="#{common.detail}">Details</th>
+                </tr>
+                </thead>
                 <tbody>
                 <tr th:each="log : ${logs.content}">
-                    <td th:text="${#temporals.format(log.createTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
-                    <td th:text="${log.username}"></td>
-                    <td th:text="${log.moduleName}"></td>
-                    <td th:text="${log.operation}"></td>
-                    <td th:text="${log.detail}"></td>
+                    <td th:text="${#temporals.format(log.createTime, 'yyyy-MM-dd HH:mm:ss')}">-</td>
+                    <td th:text="${log.username}">user</td>
+                    <td th:text="${log.moduleName}">module</td>
+                    <td><span class="status-chip status-normal" th:text="${log.operation}">operation</span></td>
+                    <td th:text="${log.ipAddress ?: '-'}">-</td>
+                    <td th:text="${log.detail}">detail</td>
                 </tr>
                 </tbody>
             </table>
+            <div class="empty-result" th:if="${logs.totalElements == 0}" th:text="#{system.logs.empty}">No operation logs found.</div>
             <div class="table-actions">
-                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${logs.hasPrevious()}" th:href="@{/system/logs(page=${logs.number - 1})}" th:text="#{common.previous}">上一页</a>
-                <span th:text="|${logs.number + 1} / ${logs.totalPages == 0 ? 1 : logs.totalPages}|"></span>
-                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${logs.hasNext()}" th:href="@{/system/logs(page=${logs.number + 1})}" th:text="#{common.next}">下一页</a>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${logs.hasPrevious()}" th:href="@{|/system/logs?page=${logs.number - 1}${queryString}|}" th:text="#{common.previous}">Previous</a>
+                <span th:text="|${logs.number + 1} / ${logs.totalPages == 0 ? 1 : logs.totalPages}|">1 / 1</span>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${logs.hasNext()}" th:href="@{|/system/logs?page=${logs.number + 1}${queryString}|}" th:text="#{common.next}">Next</a>
             </div>
         </section>
     </main>

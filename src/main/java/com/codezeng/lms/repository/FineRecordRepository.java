@@ -8,7 +8,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface FineRecordRepository extends JpaRepository<FineRecord, Long>, JpaSpecificationExecutor<FineRecord> {
@@ -18,6 +20,9 @@ public interface FineRecordRepository extends JpaRepository<FineRecord, Long>, J
     List<FineRecord> findByReaderAndDeletedFalseOrderByCreateTimeDesc(Reader reader);
 
     boolean existsByBorrowRecordAndStatus(BorrowRecord borrowRecord, FineStatus status);
+
+    @Query("select coalesce(sum(f.amount), 0) from FineRecord f where f.deleted = false and f.status = :status")
+    BigDecimal sumAmountByStatus(FineStatus status);
 
     Page<FineRecord> findByDeletedFalse(Pageable pageable);
 }

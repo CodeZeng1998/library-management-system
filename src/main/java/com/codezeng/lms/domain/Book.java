@@ -2,6 +2,7 @@ package com.codezeng.lms.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
@@ -9,7 +10,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "book_info")
+@Table(name = "book_info", indexes = {
+        @Index(name = "idx_book_deleted_isbn", columnList = "deleted,isbn"),
+        @Index(name = "idx_book_deleted_location", columnList = "deleted,location"),
+        @Index(name = "idx_book_deleted_borrow_count", columnList = "deleted,borrow_count")
+})
 public class Book extends BaseEntity {
 
     @Column(nullable = false, length = 128)

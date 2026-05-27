@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
@@ -12,7 +13,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "borrow_record")
+@Table(name = "borrow_record", indexes = {
+        @Index(name = "idx_borrow_deleted_status_due", columnList = "deleted,status,due_date"),
+        @Index(name = "idx_borrow_deleted_borrow_date", columnList = "deleted,borrow_date"),
+        @Index(name = "idx_borrow_reader_status", columnList = "reader_id,status")
+})
 public class BorrowRecord extends BaseEntity {
 
     @ManyToOne(optional = false)

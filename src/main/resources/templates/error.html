@@ -14,6 +14,7 @@
         <section class="panel">
             <h1 class="page-title" th:text="#{error.heading}">请求处理失败</h1>
             <p style="margin-top: 12px;" th:text="${errorMessage ?: #messages.msg('error.unknown')}">未知错误</p>
+            <p class="hint" th:if="${supportCode != null}" th:text="#{error.supportCode(${supportCode})}">Support code</p>
             <a class="layui-btn" th:href="@{/}" th:text="#{error.backHome}">返回首页</a>
         </section>
     </main>

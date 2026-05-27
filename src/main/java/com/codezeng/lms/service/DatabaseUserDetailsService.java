@@ -29,6 +29,9 @@ public class DatabaseUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsernameOrEmail(username, username)
                 .orElseThrow(() -> new UsernameNotFoundException("账号不存在"));
+        if (user.isDeleted()) {
+            throw new UsernameNotFoundException("Account has been deleted.");
+        }
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getUsername())
                 .password(user.getPassword())

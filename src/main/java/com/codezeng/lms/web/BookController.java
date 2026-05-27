@@ -6,6 +6,7 @@ import com.codezeng.lms.repository.BookRepository;
 import com.codezeng.lms.security.DataScopeService;
 import com.codezeng.lms.service.BookSearchCriteria;
 import com.codezeng.lms.service.BookService;
+import com.codezeng.lms.service.CsvImportGuard;
 import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.ImportResult;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,17 +45,20 @@ public class BookController {
     private final BookRepository bookRepository;
     private final BookCategoryRepository categoryRepository;
     private final BookService bookService;
+    private final CsvImportGuard csvImportGuard;
     private final DataScopeService dataScopeService;
     private final I18nMessageService i18n;
 
     public BookController(BookRepository bookRepository,
                           BookCategoryRepository categoryRepository,
                           BookService bookService,
+                          CsvImportGuard csvImportGuard,
                           DataScopeService dataScopeService,
                           I18nMessageService i18n) {
         this.bookRepository = bookRepository;
         this.categoryRepository = categoryRepository;
         this.bookService = bookService;
+        this.csvImportGuard = csvImportGuard;
         this.dataScopeService = dataScopeService;
         this.i18n = i18n;
     }
@@ -127,11 +131,14 @@ public class BookController {
                             HttpSession session,
                             RedirectAttributes redirectAttributes) {
         try {
+            csvImportGuard.validate(file);
             ImportResult result = bookService.importCsv(file);
             rememberErrorReport(session, BOOK_IMPORT_ERRORS, result);
             redirectAttributes.addFlashAttribute(result.getFailureCount() == 0 ? "message" : "error", result.toMessage());
         } catch (IOException ex) {
             redirectAttributes.addFlashAttribute("error", i18n.get("flash.import.failed", ex.getMessage()));
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/books";
     }
@@ -143,6 +150,7 @@ public class BookController {
                                 Model model,
                                 RedirectAttributes redirectAttributes) {
         try {
+            csvImportGuard.validate(file);
             session.setAttribute(BOOK_IMPORT_BYTES, file.getBytes());
             ImportResult result = bookService.previewCsv(file);
             rememberErrorReport(session, BOOK_IMPORT_ERRORS, result);
@@ -155,6 +163,9 @@ public class BookController {
             return "import/preview";
         } catch (IOException ex) {
             redirectAttributes.addFlashAttribute("error", i18n.get("flash.import.failed", ex.getMessage()));
+            return "redirect:/books";
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
             return "redirect:/books";
         }
     }

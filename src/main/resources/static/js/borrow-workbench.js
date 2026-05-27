@@ -425,7 +425,7 @@
             <td data-cell="borrowDate">${record.borrowDate || '-'}</td>
             <td data-cell="dueDate">${record.dueDate || '-'}</td>
             <td data-cell="returnDate">${record.returnDate || '-'}</td>
-            <td data-cell="status">${escapeHtml(record.statusLabel)}</td>
+            <td data-cell="status"><span class="status-chip status-${escapeHtml(record.status.toLowerCase())}">${escapeHtml(record.statusLabel)}</span></td>
             <td data-cell="fine">${formatMoney(record.fineAmount)}</td>
             <td class="table-actions" data-cell="actions">${recordActions(record)}</td>
         `;

@@ -2,10 +2,16 @@ package com.codezeng.lms.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "operation_log")
+@Table(name = "operation_log", indexes = {
+        @Index(name = "idx_operation_deleted_created", columnList = "deleted,create_time"),
+        @Index(name = "idx_operation_user_created", columnList = "username,create_time"),
+        @Index(name = "idx_operation_module_created", columnList = "module_name,create_time"),
+        @Index(name = "idx_operation_ip_created", columnList = "ip_address,create_time")
+})
 public class OperationLog extends BaseEntity {
 
     @Column(nullable = false, length = 64)
@@ -31,6 +37,11 @@ public class OperationLog extends BaseEntity {
         this.moduleName = moduleName;
         this.operation = operation;
         this.detail = detail;
+    }
+
+    public OperationLog(String username, String moduleName, String operation, String detail, String ipAddress) {
+        this(username, moduleName, operation, detail);
+        this.ipAddress = ipAddress;
     }
 
     public String getUsername() {

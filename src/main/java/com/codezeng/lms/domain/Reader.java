@@ -7,13 +7,19 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "reader_info")
+@Table(name = "reader_info", indexes = {
+        @Index(name = "idx_reader_deleted_reader_no", columnList = "deleted,reader_no"),
+        @Index(name = "idx_reader_deleted_email", columnList = "deleted,email"),
+        @Index(name = "idx_reader_deleted_status", columnList = "deleted,status"),
+        @Index(name = "idx_reader_deleted_name", columnList = "deleted,name")
+})
 public class Reader extends BaseEntity {
 
     @Column(nullable = false, unique = true, length = 32)

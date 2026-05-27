@@ -43,7 +43,7 @@
                     <td th:text="${reader.email}"></td>
                     <td th:text="${#messages.msg('readerType.' + reader.readerType.name())}"></td>
                     <td th:text="${#messages.msg('memberLevel.' + reader.memberLevel.name())}"></td>
-                    <td th:text="${#messages.msg('status.' + reader.status.name())}"></td>
+                    <td><span class="status-chip" th:classappend="${' status-' + reader.status.name().toLowerCase()}" th:text="${#messages.msg('status.' + reader.status.name())}"></span></td>
                     <td class="table-actions">
                         <a class="layui-btn layui-btn-xs" th:href="@{/readers/{id}/edit(id=${reader.id})}" sec:authorize="hasAuthority('READER_EDIT')" th:text="#{common.edit}">编辑</a>
                         <form th:action="@{/readers/{id}/delete(id=${reader.id})}" method="post" th:attr="onsubmit=|return confirm('#{reader.confirmDelete}')|" sec:authorize="hasAuthority('READER_DELETE')">
@@ -54,6 +54,7 @@
                 </tr>
                 </tbody>
             </table>
+            <div class="empty-result" th:if="${readers.totalElements == 0}" th:text="#{reader.empty}">暂无读者记录。</div>
             <div class="table-actions">
                 <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${readers.hasPrevious()}" th:href="@{/readers(page=${readers.number - 1}, keyword=${keyword}, size=${pageSize})}" th:text="#{common.previous}">上一页</a>
                 <span th:text="|${readers.number + 1} / ${readers.totalPages == 0 ? 1 : readers.totalPages}|"></span>

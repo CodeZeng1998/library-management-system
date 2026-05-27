@@ -17,7 +17,32 @@
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
         <section class="panel">
-            <table class="layui-table">
+            <div class="table-toolbar">
+                <div>
+                    <h2 class="section-title" th:text="#{user.list.title}">User Management</h2>
+                    <span class="hint" th:text="#{user.keyword.placeholder}">Username / email / nickname / phone</span>
+                </div>
+                <form class="admin-filter" th:action="@{/users}" method="get">
+                    <select class="layui-select" name="role">
+                        <option value="" th:selected="${role == null}" th:text="#{user.role.all}">All roles</option>
+                        <option th:each="item : ${roles}"
+                                th:value="${item.name()}"
+                                th:selected="${role != null and role == item}"
+                                th:text="${#messages.msg('role.' + item.name())}"></option>
+                    </select>
+                    <select class="layui-select" name="status">
+                        <option value="" th:selected="${status == null}" th:text="#{user.status.all}">All statuses</option>
+                        <option th:each="item : ${accountStatuses}"
+                                th:value="${item.name()}"
+                                th:selected="${status != null and status == item}"
+                                th:text="${#messages.msg('status.' + item.name())}"></option>
+                    </select>
+                    <input class="layui-input" name="keyword" th:value="${keyword}" th:placeholder="#{user.keyword.placeholder}">
+                    <button class="layui-btn" type="submit" th:text="#{common.search}">Search</button>
+                    <a class="layui-btn layui-btn-primary" th:href="@{/users}" th:text="#{common.reset}">Reset</a>
+                </form>
+            </div>
+            <table class="layui-table responsive-table">
                 <thead>
                 <tr>
                     <th th:text="#{user.username}">Username</th>
@@ -39,12 +64,32 @@
                     <td th:text="${#messages.msg('role.' + user.role.name())}"></td>
                     <td th:text="${user.managedLocationPrefix ?: '-'}"></td>
                     <td th:text="${user.permissionCodes ?: '-'}"></td>
-                    <td th:text="${#messages.msg('status.' + user.status.name())}"></td>
+                    <td><span class="status-chip" th:classappend="${' status-' + user.status.name().toLowerCase()}" th:text="${#messages.msg('status.' + user.status.name())}"></span></td>
                     <td th:text="${user.lastLoginTime == null ? '-' : #temporals.format(user.lastLoginTime, 'yyyy-MM-dd HH:mm')}"></td>
-                    <td><a class="layui-btn layui-btn-xs" th:href="@{/users/{id}/edit(id=${user.id})}" th:text="#{common.edit}">Edit</a></td>
+                    <td class="table-actions">
+                        <a class="layui-btn layui-btn-xs" th:href="@{/users/{id}/edit(id=${user.id})}" th:text="#{common.edit}">Edit</a>
+                        <form th:if="${user.status.name() != 'DISABLED'}" th:action="@{/users/{id}/disable(id=${user.id})}" method="post" th:attr="onsubmit=|return confirm('#{user.confirmDisable}')|">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs layui-btn-primary" type="submit" th:text="#{common.disable}">Disable</button>
+                        </form>
+                        <form th:if="${user.status.name() == 'DISABLED'}" th:action="@{/users/{id}/enable(id=${user.id})}" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs" type="submit" th:text="#{common.enable}">Enable</button>
+                        </form>
+                        <form th:action="@{/users/{id}/delete(id=${user.id})}" method="post" th:attr="onsubmit=|return confirm('#{user.confirmDelete}')|">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs layui-btn-danger" type="submit" th:text="#{common.delete}">Delete</button>
+                        </form>
+                    </td>
                 </tr>
                 </tbody>
             </table>
+            <div class="empty-result" th:if="${users.totalElements == 0}" th:text="#{user.empty}">No users found.</div>
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${users.hasPrevious()}" th:href="@{|/users?page=${users.number - 1}${queryString}|}" th:text="#{common.previous}">Previous</a>
+                <span th:text="|${users.number + 1} / ${users.totalPages == 0 ? 1 : users.totalPages}|"></span>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${users.hasNext()}" th:href="@{|/users?page=${users.number + 1}${queryString}|}" th:text="#{common.next}">Next</a>
+            </div>
         </section>
     </main>
 </div>

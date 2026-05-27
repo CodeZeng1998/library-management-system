@@ -1,20 +1,25 @@
 package com.codezeng.lms.web;
 
+import com.codezeng.lms.domain.Notification;
 import com.codezeng.lms.repository.NotificationRepository;
 import com.codezeng.lms.domain.enums.NotificationStatus;
 import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.NotificationService;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 
@@ -36,12 +41,14 @@ public class NotificationController {
     @PreAuthorize("hasAuthority('NOTIFICATION_VIEW')")
     public String list(@RequestParam(defaultValue = "0") int page,
                        @RequestParam(required = false) NotificationStatus status,
+                       @RequestParam(required = false) String keyword,
                        Model model) {
-        PageRequest pageable = PageRequest.of(page, 12, Sort.by(Sort.Direction.DESC, "sentAt"));
-        model.addAttribute("notifications", status == null
-                ? notificationRepository.findByDeletedFalse(pageable)
-                : notificationRepository.findByStatusAndDeletedFalse(status, pageable));
+        PageRequest pageable = PageRequest.of(Math.max(page, 0), 12, Sort.by(Sort.Direction.DESC, "sentAt"));
+        Page<Notification> notifications = notificationRepository.findAll(notificationSpec(status, keyword), pageable);
+        model.addAttribute("notifications", notifications);
         model.addAttribute("status", status);
+        model.addAttribute("keyword", keyword);
+        model.addAttribute("queryString", queryString(status, keyword));
         model.addAttribute("unreadCount", notificationRepository.countByStatusAndDeletedFalse(NotificationStatus.UNREAD));
         return "notification/list";
     }
@@ -58,10 +65,13 @@ public class NotificationController {
     @PreAuthorize("hasAuthority('NOTIFICATION_VIEW')")
     public String batch(@RequestParam(required = false) List<Long> ids,
                         @RequestParam String action,
+                        @RequestParam(required = false) NotificationStatus status,
+                        @RequestParam(required = false) String keyword,
                         RedirectAttributes redirectAttributes) {
+        String redirect = "redirect:/notifications" + redirectQuery(status, keyword);
         if (ids == null || ids.isEmpty()) {
             redirectAttributes.addFlashAttribute("error", i18n.get("notification.batch.empty"));
-            return "redirect:/notifications";
+            return redirect;
         }
         int count;
         if ("delete".equals(action)) {
@@ -71,6 +81,48 @@ public class NotificationController {
             count = notificationService.markRead(ids);
             redirectAttributes.addFlashAttribute("message", i18n.get("notification.batch.read", count));
         }
-        return "redirect:/notifications";
+        return redirect;
+    }
+
+    private Specification<Notification> notificationSpec(NotificationStatus status, String keyword) {
+        Specification<Notification> spec = (root, query, builder) -> builder.isFalse(root.get("deleted"));
+        if (status != null) {
+            spec = spec.and((root, query, builder) -> builder.equal(root.get("status"), status));
+        }
+        if (StringUtils.hasText(keyword)) {
+            String like = "%" + keyword.trim().toLowerCase() + "%";
+            spec = spec.and((root, query, builder) -> builder.or(
+                    builder.like(builder.lower(root.get("title")), like),
+                    builder.like(builder.lower(root.get("content")), like),
+                    builder.like(builder.lower(root.join("reader").get("readerNo")), like),
+                    builder.like(builder.lower(root.join("reader").get("name")), like)));
+        }
+        return spec;
+    }
+
+    private String queryString(NotificationStatus status, String keyword) {
+        UriComponentsBuilder builder = UriComponentsBuilder.newInstance();
+        queryParam(builder, "status", status);
+        queryParam(builder, "keyword", keyword);
+        String query = builder.build().encode().toUriString();
+        return query.startsWith("?") ? "&" + query.substring(1) : query;
+    }
+
+    private String redirectQuery(NotificationStatus status, String keyword) {
+        UriComponentsBuilder builder = UriComponentsBuilder.newInstance();
+        queryParam(builder, "status", status);
+        queryParam(builder, "keyword", keyword);
+        String query = builder.build().encode().toUriString();
+        return query.isBlank() ? "" : query;
+    }
+
+    private void queryParam(UriComponentsBuilder builder, String name, Object value) {
+        if (value == null) {
+            return;
+        }
+        String text = String.valueOf(value);
+        if (!text.isBlank()) {
+            builder.queryParam(name, text);
+        }
     }
 }
