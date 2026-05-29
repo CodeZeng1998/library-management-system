@@ -3,6 +3,7 @@ package com.codezeng.lms.web;
 import com.codezeng.lms.domain.Book;
 import com.codezeng.lms.repository.BookCategoryRepository;
 import com.codezeng.lms.repository.BookRepository;
+import com.codezeng.lms.repository.BookTagRepository;
 import com.codezeng.lms.security.DataScopeService;
 import com.codezeng.lms.service.BookSearchCriteria;
 import com.codezeng.lms.service.BookService;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
+import com.codezeng.lms.security.PreventDuplicateSubmit;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +46,7 @@ public class BookController {
 
     private final BookRepository bookRepository;
     private final BookCategoryRepository categoryRepository;
+    private final BookTagRepository tagRepository;
     private final BookService bookService;
     private final CsvImportGuard csvImportGuard;
     private final DataScopeService dataScopeService;
@@ -51,12 +54,14 @@ public class BookController {
 
     public BookController(BookRepository bookRepository,
                           BookCategoryRepository categoryRepository,
+                          BookTagRepository tagRepository,
                           BookService bookService,
                           CsvImportGuard csvImportGuard,
                           DataScopeService dataScopeService,
                           I18nMessageService i18n) {
         this.bookRepository = bookRepository;
         this.categoryRepository = categoryRepository;
+        this.tagRepository = tagRepository;
         this.bookService = bookService;
         this.csvImportGuard = csvImportGuard;
         this.dataScopeService = dataScopeService;
@@ -77,9 +82,11 @@ public class BookController {
         model.addAttribute("criteria", criteria);
         model.addAttribute("pageSize", pageSize);
         model.addAttribute("categories", categoryRepository.findByDeletedFalseOrderByNameAsc());
+        model.addAttribute("tags", tagRepository.findByDeletedFalseOrderByNameAsc());
         model.addAttribute("locations", visibleLocations());
         model.addAttribute("suggestions", suggestions());
         model.addAttribute("queryString", queryString(criteria, pageSize));
+        model.addAttribute("exportQueryString", exportQueryString(request));
         model.addAttribute("currentUrl", currentUrl(request));
         return "book/list";
     }
@@ -89,6 +96,7 @@ public class BookController {
     public String create(Model model) {
         model.addAttribute("book", new Book());
         model.addAttribute("categories", categoryRepository.findByDeletedFalseOrderByNameAsc());
+        model.addAttribute("tags", tagRepository.findByDeletedFalseOrderByNameAsc());
         return "book/form";
     }
 
@@ -97,24 +105,39 @@ public class BookController {
     public String edit(@PathVariable Long id, Model model) {
         model.addAttribute("book", bookService.getVisible(id));
         model.addAttribute("categories", categoryRepository.findByDeletedFalseOrderByNameAsc());
+        model.addAttribute("tags", tagRepository.findByDeletedFalseOrderByNameAsc());
         return "book/form";
     }
 
     @PostMapping
     @PreAuthorize("hasAuthority('BOOK_EDIT')")
+    @PreventDuplicateSubmit
     public String save(@ModelAttribute Book book,
                        @RequestParam(required = false) Long categoryId,
+                       @RequestParam(required = false) List<Long> tagIds,
+                       @RequestParam(required = false) String tagNames,
+                       Model model,
                        RedirectAttributes redirectAttributes) {
-        if (categoryId != null) {
-            book.setCategory(categoryRepository.findById(categoryId).orElse(null));
+        try {
+            if (categoryId != null) {
+                book.setCategory(categoryRepository.findById(categoryId).orElse(null));
+            }
+            book.setTags(bookService.resolveTags(tagIds, tagNames));
+            bookService.save(book);
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.book.saved"));
+            return "redirect:/books";
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            model.addAttribute("book", book);
+            model.addAttribute("categories", categoryRepository.findByDeletedFalseOrderByNameAsc());
+            model.addAttribute("tags", tagRepository.findByDeletedFalseOrderByNameAsc());
+            model.addAttribute("error", ex.getMessage());
+            return "book/form";
         }
-        bookService.save(book);
-        redirectAttributes.addFlashAttribute("message", i18n.get("flash.book.saved"));
-        return "redirect:/books";
     }
 
     @PostMapping("/{id}/delete")
     @PreAuthorize("hasAuthority('BOOK_DELETE')")
+    @PreventDuplicateSubmit
     public String delete(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
             bookService.softDelete(id);
@@ -204,8 +227,66 @@ public class BookController {
 
     @GetMapping("/export")
     @PreAuthorize("hasAuthority('BOOK_VIEW')")
-    public ResponseEntity<byte[]> exportCsv() {
-        return csvResponse("books.csv", bookService.exportCsv());
+    public ResponseEntity<byte[]> exportCsv(BookSearchCriteria criteria) {
+        normalizeCriteria(criteria);
+        return csvResponse("books.csv", bookService.exportCsv(criteria));
+    }
+
+    @PostMapping("/batch-delete")
+    @PreAuthorize("hasAuthority('BOOK_DELETE')")
+    @PreventDuplicateSubmit
+    public String batchDelete(@RequestParam(required = false) List<Long> ids,
+                              RedirectAttributes redirectAttributes) {
+        if (ids == null || ids.isEmpty()) {
+            redirectAttributes.addFlashAttribute("error", i18n.get("common.batch.none"));
+            return "redirect:/books";
+        }
+        BookService.BatchOperationResult result = bookService.batchSoftDelete(ids);
+        if (result.hasFailures()) {
+            redirectAttributes.addFlashAttribute("error",
+                    i18n.get("flash.book.batchDeletedWithFailures", result.successCount(), result.failureCount()));
+        } else {
+            redirectAttributes.addFlashAttribute("message",
+                    i18n.get("flash.book.batchDeleted", result.successCount()));
+        }
+        return "redirect:/books";
+    }
+
+    @GetMapping("/trash")
+    @PreAuthorize("hasAuthority('BOOK_DELETE')")
+    public String trash(@RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "30") int size,
+                        Model model) {
+        int pageSize = normalizedPageSize(size);
+        model.addAttribute("books", bookService.trash(PageRequest.of(Math.max(page, 0), pageSize, Sort.by(Sort.Direction.DESC, "updateTime"))));
+        model.addAttribute("pageSize", pageSize);
+        return "book/trash";
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize("hasAuthority('BOOK_DELETE')")
+    @PreventDuplicateSubmit
+    public String restore(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            bookService.restore(id);
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.book.restored"));
+        } catch (IllegalStateException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/books/trash";
+    }
+
+    @PostMapping("/{id}/purge")
+    @PreAuthorize("hasAuthority('BOOK_DELETE')")
+    @PreventDuplicateSubmit
+    public String purge(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            bookService.purge(id);
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.book.purged"));
+        } catch (IllegalStateException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/books/trash";
     }
 
     private void rememberErrorReport(HttpSession session, String key, ImportResult result) {
@@ -263,16 +344,17 @@ public class BookController {
             if (book.getCategory() != null) {
                 values.add(book.getCategory().getName());
             }
+            if (book.getTags() != null) {
+                book.getTags().forEach(tag -> values.add(tag.getName()));
+            }
         });
         return values.stream().filter(value -> value != null && !value.isBlank()).distinct().limit(20).toList();
     }
 
     private List<String> visibleLocations() {
-        return bookRepository.findAll(dataScopeService.bookScope(), Sort.by("location")).stream()
-                .map(Book::getLocation)
-                .filter(value -> value != null && !value.isBlank())
-                .distinct()
-                .toList();
+        return dataScopeService.currentLocationPrefix()
+                .map(bookRepository::findDistinctLocationsByPrefix)
+                .orElseGet(bookRepository::findDistinctLocations);
     }
 
     private String queryString(BookSearchCriteria criteria, int size) {
@@ -284,6 +366,9 @@ public class BookController {
         queryParam(builder, "authorMatch", criteria.getAuthorMatch());
         if (criteria.getCategoryIds() != null) {
             criteria.getCategoryIds().forEach(id -> builder.queryParam("categoryIds", id));
+        }
+        if (criteria.getTagIds() != null) {
+            criteria.getTagIds().forEach(id -> builder.queryParam("tagIds", id));
         }
         queryParam(builder, "publishYearFrom", criteria.getPublishYearFrom());
         queryParam(builder, "publishYearTo", criteria.getPublishYearTo());
@@ -311,5 +396,10 @@ public class BookController {
     private String currentUrl(HttpServletRequest request) {
         String query = request.getQueryString();
         return request.getRequestURI() + (query == null || query.isBlank() ? "" : "?" + query);
+    }
+
+    private String exportQueryString(HttpServletRequest request) {
+        String query = request.getQueryString();
+        return query == null || query.isBlank() ? "" : "?" + query;
     }
 }

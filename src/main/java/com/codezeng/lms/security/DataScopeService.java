@@ -43,6 +43,14 @@ public class DataScopeService {
                 .orElseGet(() -> builder.isFalse(root.get("deleted")));
     }
 
+    public Specification<Book> deletedBookScope() {
+        return (root, query, builder) -> currentLocationPrefix()
+                .map(prefix -> builder.and(
+                        builder.isTrue(root.get("deleted")),
+                        builder.like(root.get("location"), prefix + "%")))
+                .orElseGet(() -> builder.isTrue(root.get("deleted")));
+    }
+
     public Specification<BorrowRecord> borrowRecordScope() {
         return (root, query, builder) -> currentLocationPrefix()
                 .map(prefix -> builder.and(

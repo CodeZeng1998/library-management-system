@@ -5,10 +5,10 @@ spring:
   application:
     name: library-management-system
   datasource:
-    url: jdbc:mysql://localhost:3306/library_management?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
-    username: root
-    password: 123456
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${LMS_DATASOURCE_URL:jdbc:h2:mem:lms_dev;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${LMS_DATASOURCE_USERNAME:sa}
+    password: ${LMS_DATASOURCE_PASSWORD:}
+    driver-class-name: ${LMS_DATASOURCE_DRIVER:org.h2.Driver}
   jpa:
     hibernate:
       ddl-auto: update
@@ -16,9 +16,13 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        default_batch_fetch_size: 50
   thymeleaf:
     cache: false
 
 app:
   security:
-    remember-me-key: ${LMS_REMEMBER_ME_KEY:local-dev-key}
+    remember-me-key: ${LMS_REMEMBER_ME_KEY:}
+  seed:
+    bootstrap-admin-enabled: ${LMS_BOOTSTRAP_ADMIN_ENABLED:true}
+    demo-enabled: ${LMS_SEED_DEMO_ENABLED:false}

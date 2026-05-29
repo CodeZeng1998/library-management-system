@@ -26,7 +26,11 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -35,6 +39,8 @@ public class ReaderPortalService {
 
     private static final List<BorrowStatus> ACTIVE_STATUSES = List.of(BorrowStatus.BORROWED, BorrowStatus.OVERDUE);
     private static final List<ReservationStatus> ACTIVE_RESERVATION_STATUSES = List.of(ReservationStatus.WAITING, ReservationStatus.NOTIFIED);
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final UserRepository userRepository;
     private final ReaderRepository readerRepository;
@@ -43,6 +49,7 @@ public class ReaderPortalService {
     private final FineRecordRepository fineRecordRepository;
     private final NotificationRepository notificationRepository;
     private final RecommendationService recommendationService;
+    private final OperationLogService operationLogService;
 
     public ReaderPortalService(UserRepository userRepository,
                                ReaderRepository readerRepository,
@@ -50,7 +57,8 @@ public class ReaderPortalService {
                                ReservationRecordRepository reservationRecordRepository,
                                FineRecordRepository fineRecordRepository,
                                NotificationRepository notificationRepository,
-                               RecommendationService recommendationService) {
+                               RecommendationService recommendationService,
+                               OperationLogService operationLogService) {
         this.userRepository = userRepository;
         this.readerRepository = readerRepository;
         this.borrowRecordRepository = borrowRecordRepository;
@@ -58,6 +66,7 @@ public class ReaderPortalService {
         this.fineRecordRepository = fineRecordRepository;
         this.notificationRepository = notificationRepository;
         this.recommendationService = recommendationService;
+        this.operationLogService = operationLogService;
     }
 
     public Reader requireCurrentReader() {
@@ -117,23 +126,85 @@ public class ReaderPortalService {
                 notificationRepository.countByReaderAndStatusAndDeletedFalse(reader, NotificationStatus.UNREAD));
     }
 
+    public String exportActivityCsv() {
+        Reader reader = requireCurrentReader();
+        List<ActivityRow> rows = new ArrayList<>();
+
+        for (BorrowRecord record : borrowRecordRepository.findByReaderAndDeletedFalseOrderByBorrowDateDesc(reader)) {
+            rows.add(new ActivityRow(
+                    record.getBorrowDate().atStartOfDay(),
+                    "Borrow",
+                    record.getStatus().name(),
+                    record.getBook().getTitle(),
+                    record.getBook().getIsbn(),
+                    "Borrowed " + formatDate(record.getBorrowDate())
+                            + ", due " + formatDate(record.getDueDate())
+                            + ", returned " + formatDate(record.getReturnDate())
+                            + ", fine " + record.getFineAmount()));
+        }
+        for (ReservationRecord record : reservationRecordRepository.findByReaderAndDeletedFalseOrderByReservedAtDesc(reader)) {
+            rows.add(new ActivityRow(
+                    record.getReservedAt(),
+                    "Reservation",
+                    record.getStatus().name(),
+                    record.getBook().getTitle(),
+                    record.getBook().getIsbn(),
+                    "Reserved " + formatTime(record.getReservedAt())
+                            + ", expires " + formatTime(record.getExpiresAt())));
+        }
+        for (FineRecord fine : fineRecordRepository.findByReaderAndDeletedFalseOrderByCreateTimeDesc(reader)) {
+            BorrowRecord borrowRecord = fine.getBorrowRecord();
+            rows.add(new ActivityRow(
+                    fine.getCreateTime(),
+                    "Fine",
+                    fine.getStatus().name(),
+                    borrowRecord == null ? "" : borrowRecord.getBook().getTitle(),
+                    borrowRecord == null ? "" : borrowRecord.getBook().getIsbn(),
+                    fine.getReason() + ", amount " + fine.getAmount() + ", paid " + formatTime(fine.getPaidAt())));
+        }
+        for (Notification notification : notificationRepository
+                .findByReaderAndDeletedFalse(reader, PageRequest.of(0, 500, Sort.by(Sort.Direction.DESC, "sentAt")))
+                .getContent()) {
+            rows.add(new ActivityRow(
+                    notification.getSentAt(),
+                    "Notification",
+                    notification.getStatus().name(),
+                    notification.getTitle(),
+                    "",
+                    notification.getContent()));
+        }
+
+        rows.sort(Comparator.comparing(ActivityRow::time, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+        StringBuilder csv = new StringBuilder("\uFEFFTime,Type,Status,Title,ISBN,Detail\n");
+        for (ActivityRow row : rows) {
+            csv.append(CsvSupport.csv(formatTime(row.time()))).append(',')
+                    .append(CsvSupport.csv(row.type())).append(',')
+                    .append(CsvSupport.csv(row.status())).append(',')
+                    .append(CsvSupport.csv(row.title())).append(',')
+                    .append(CsvSupport.csv(row.isbn())).append(',')
+                    .append(CsvSupport.csv(row.detail())).append('\n');
+        }
+        operationLogService.record("Reader portal", "Export personal activity", reader.getReaderNo() + " rows: " + rows.size());
+        return csv.toString();
+    }
+
     public void requireOwnedBorrow(Long recordId) {
-        BorrowRecord record = borrowRecordRepository.findById(recordId).orElseThrow();
+        BorrowRecord record = borrowRecordRepository.findByIdAndDeletedFalse(recordId).orElseThrow();
         requireOwner(record.getReader());
     }
 
     public void requireOwnedReservation(Long reservationId) {
-        ReservationRecord record = reservationRecordRepository.findById(reservationId).orElseThrow();
+        ReservationRecord record = reservationRecordRepository.findByIdAndDeletedFalse(reservationId).orElseThrow();
         requireOwner(record.getReader());
     }
 
     public void requireOwnedFine(Long fineId) {
-        FineRecord fine = fineRecordRepository.findById(fineId).orElseThrow();
+        FineRecord fine = fineRecordRepository.findByIdForUpdate(fineId).orElseThrow();
         requireOwner(fine.getReader());
     }
 
     public void requireOwnedNotification(Long notificationId) {
-        Notification notification = notificationRepository.findById(notificationId).orElseThrow();
+        Notification notification = notificationRepository.findByIdAndDeletedFalse(notificationId).orElseThrow();
         requireOwner(notification.getReader());
     }
 
@@ -147,14 +218,8 @@ public class ReaderPortalService {
     private ReservationView toReservationView(ReservationRecord record) {
         int position = 0;
         if (record.getStatus() == ReservationStatus.WAITING) {
-            List<ReservationRecord> queue = reservationRecordRepository
-                    .findByBookAndStatusOrderByReservedAtAsc(record.getBook(), ReservationStatus.WAITING);
-            for (int index = 0; index < queue.size(); index++) {
-                if (Objects.equals(queue.get(index).getId(), record.getId())) {
-                    position = index + 1;
-                    break;
-                }
-            }
+            position = Math.toIntExact(reservationRecordRepository.countByBookAndStatusAndReservedAtBeforeAndDeletedFalse(
+                    record.getBook(), ReservationStatus.WAITING, record.getReservedAt()) + 1);
         }
         return new ReservationView(record, position);
     }
@@ -166,6 +231,14 @@ public class ReaderPortalService {
 
     public long daysUntilDue(BorrowRecord record) {
         return ChronoUnit.DAYS.between(LocalDate.now(), record.getDueDate());
+    }
+
+    private String formatDate(LocalDate date) {
+        return date == null ? "" : DATE_FORMAT.format(date);
+    }
+
+    private String formatTime(LocalDateTime time) {
+        return time == null ? "" : TIME_FORMAT.format(time);
     }
 
     public record ReaderPortalDashboard(Reader reader,
@@ -181,5 +254,8 @@ public class ReaderPortalService {
     }
 
     public record ReservationView(ReservationRecord record, int queuePosition) {
+    }
+
+    private record ActivityRow(LocalDateTime time, String type, String status, String title, String isbn, String detail) {
     }
 }

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|#{tag.title} - #{app.name}|">Tag Management</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <div th:replace="~{fragments/nav :: sidebar}"></div>
+    <main class="content">
+        <div class="topbar">
+            <div>
+                <h1 class="page-title" th:text="#{tag.title}">Tag Dictionary</h1>
+                <p class="portal-subtitle" th:text="#{tag.subtitle}">Govern reusable book discovery labels.</p>
+            </div>
+        </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
+
+        <section class="panel">
+            <div class="table-toolbar">
+                <div>
+                    <h2 class="section-title" th:text="${tag.id == null ? #messages.msg('tag.add') : #messages.msg('tag.edit')}">Add Tag</h2>
+                    <span class="hint" th:text="#{tag.formHint}">Use controlled tags for discovery and operations.</span>
+                </div>
+            </div>
+            <form class="form-grid compact-form-grid" th:action="@{/tags}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <input type="hidden" th:field="${tag.id}">
+                <input type="hidden" name="keyword" th:value="${keyword}">
+                <div>
+                    <label th:text="#{tag.name}">Tag Name</label>
+                    <input class="layui-input" th:field="${tag.name}" maxlength="64" required>
+                </div>
+                <div>
+                    <label th:text="#{common.description}">Description</label>
+                    <input class="layui-input" th:field="${tag.description}" maxlength="200">
+                </div>
+                <div class="table-actions">
+                    <button class="layui-btn" type="submit" th:text="#{common.save}">Save</button>
+                    <a class="layui-btn layui-btn-primary" th:href="@{/tags}" th:text="#{common.reset}">Reset</a>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel">
+            <div class="table-toolbar">
+                <div>
+                    <h2 class="section-title" th:text="#{tag.listTitle}">Tag List</h2>
+                    <span class="hint" th:text="#{tag.keyword.placeholder}">Tag name / description</span>
+                </div>
+                <form class="admin-filter" th:action="@{/tags}" method="get">
+                    <input class="layui-input" name="keyword" th:value="${keyword}" th:placeholder="#{tag.keyword.placeholder}">
+                    <button class="layui-btn" type="submit" th:text="#{common.search}">Search</button>
+                    <a class="layui-btn layui-btn-primary" th:href="@{/tags}" th:text="#{common.reset}">Reset</a>
+                    <a class="layui-btn layui-btn-primary" th:href="@{|/tags/export?keyword=${keyword ?: ''}|}" th:text="#{common.exportCsv}">Export CSV</a>
+                </form>
+            </div>
+            <table class="layui-table responsive-table">
+                <thead>
+                <tr>
+                    <th th:text="#{tag.name}">Tag Name</th>
+                    <th th:text="#{common.description}">Description</th>
+                    <th th:text="#{tag.usageCount}">Books</th>
+                    <th th:text="#{common.time}">Time</th>
+                    <th th:text="#{common.operation}">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${tags.content}">
+                    <td>
+                        <span class="tag-chip" th:text="${item.name}">Tag</span>
+                    </td>
+                    <td th:text="${item.description ?: '-'}">Description</td>
+                    <td th:text="${usageCounts[item.id] ?: 0}">0</td>
+                    <td th:text="${#temporals.format(item.updateTime, 'yyyy-MM-dd HH:mm')}">Time</td>
+                    <td class="table-actions">
+                        <a class="layui-btn layui-btn-xs" th:href="@{|/tags/${item.id}/edit?page=${tags.number}${queryString}|}" th:text="#{common.edit}">Edit</a>
+                        <form th:action="@{/tags/{id}/delete(id=${item.id})}" method="post" th:attr="onsubmit=|return confirm('#{tag.confirmDelete}')|">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <input type="hidden" name="keyword" th:value="${keyword}">
+                            <button class="layui-btn layui-btn-xs layui-btn-danger" type="submit" th:text="#{common.delete}">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div class="empty-result" th:if="${tags.totalElements == 0}" th:text="#{tag.empty}">No tags.</div>
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${tags.hasPrevious()}" th:href="@{|/tags?page=${tags.number - 1}${queryString}|}" th:text="#{common.previous}">Previous</a>
+                <span th:text="|${tags.number + 1} / ${tags.totalPages == 0 ? 1 : tags.totalPages}|"></span>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${tags.hasNext()}" th:href="@{|/tags?page=${tags.number + 1}${queryString}|}" th:text="#{common.next}">Next</a>
+            </div>
+        </section>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
+</body>
+</html>

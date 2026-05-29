@@ -3,11 +3,16 @@ package com.codezeng.lms.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "book_info", indexes = {
@@ -31,6 +36,12 @@ public class Book extends BaseEntity {
 
     @ManyToOne
     private BookCategory category;
+
+    @ManyToMany
+    @JoinTable(name = "book_tag_rel",
+            joinColumns = @JoinColumn(name = "book_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id"))
+    private Set<BookTag> tags = new LinkedHashSet<>();
 
     @Column(nullable = false)
     private int totalQuantity;
@@ -105,6 +116,14 @@ public class Book extends BaseEntity {
 
     public void setCategory(BookCategory category) {
         this.category = category;
+    }
+
+    public Set<BookTag> getTags() {
+        return tags;
+    }
+
+    public void setTags(Set<BookTag> tags) {
+        this.tags = tags == null ? new LinkedHashSet<>() : tags;
     }
 
     public int getTotalQuantity() {

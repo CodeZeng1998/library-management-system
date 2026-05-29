@@ -1,14 +1,11 @@
 package com.codezeng.lms.web;
 
-import com.codezeng.lms.domain.Book;
 import com.codezeng.lms.domain.Reader;
-import com.codezeng.lms.repository.BookRepository;
-import com.codezeng.lms.repository.ReaderRepository;
-import com.codezeng.lms.security.DataScopeService;
 import com.codezeng.lms.service.ReaderPortalService;
 import com.codezeng.lms.service.RecommendationService;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -17,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Controller
@@ -24,20 +22,11 @@ import java.util.List;
 public class RecommendationController {
 
     private final RecommendationService recommendationService;
-    private final ReaderRepository readerRepository;
-    private final BookRepository bookRepository;
-    private final DataScopeService dataScopeService;
     private final ReaderPortalService readerPortalService;
 
     public RecommendationController(RecommendationService recommendationService,
-                                    ReaderRepository readerRepository,
-                                    BookRepository bookRepository,
-                                    DataScopeService dataScopeService,
                                     ReaderPortalService readerPortalService) {
         this.recommendationService = recommendationService;
-        this.readerRepository = readerRepository;
-        this.bookRepository = bookRepository;
-        this.dataScopeService = dataScopeService;
         this.readerPortalService = readerPortalService;
     }
 
@@ -53,18 +42,29 @@ public class RecommendationController {
             model.addAttribute("readers", List.of(reader));
             model.addAttribute("readerOnly", true);
         } else {
-            model.addAttribute("readers", readerRepository.findByDeletedFalse(PageRequest.of(0, 200, Sort.by("readerNo"))).getContent());
+            model.addAttribute("readers", recommendationService.selectableReaders());
             model.addAttribute("readerOnly", false);
         }
-        model.addAttribute("books", visibleBooks());
+        model.addAttribute("books", recommendationService.visibleBooks());
         model.addAttribute("dashboard", recommendationService.dashboard(readerId, bookId));
         model.addAttribute("readerId", readerId);
         model.addAttribute("bookId", bookId);
         return "recommendation/index";
     }
 
-    private List<Book> visibleBooks() {
-        return bookRepository.findAll(dataScopeService.bookScope(), Sort.by("title"));
+    @GetMapping("/export")
+    @PreAuthorize("hasAuthority('RECOMMENDATION_VIEW')")
+    public ResponseEntity<byte[]> exportCsv(@RequestParam(required = false) Long readerId,
+                                            @RequestParam(required = false) Long bookId,
+                                            Authentication authentication) {
+        if (isReaderOnly(authentication)) {
+            readerId = readerPortalService.requireCurrentReader().getId();
+        }
+        String csv = recommendationService.exportCsv(readerId, bookId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=recommendations.csv")
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .body(csv.getBytes(StandardCharsets.UTF_8));
     }
 
     private boolean isReaderOnly(Authentication authentication) {

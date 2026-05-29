@@ -8,7 +8,12 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 50
 
 app:
   security:
-    remember-me-key: test-only-remember-me-key
+    remember-me-key: ${LMS_REMEMBER_ME_KEY:}
+  seed:
+    bootstrap-admin-enabled: false

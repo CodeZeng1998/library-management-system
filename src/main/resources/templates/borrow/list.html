@@ -1,11 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
-    <title th:text="|#{borrow.title} - #{app.name}|">借阅管理 - 图书管理系统</title>
+    <title th:text="|#{borrow.title} - #{app.name}|">Borrow Management - Library Management System</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -45,87 +46,87 @@
           th:data-renew="#{borrow.renew}"
           th:data-return="#{borrow.return}">
         <div class="topbar">
-            <h1 class="page-title" th:text="#{borrow.title}">借阅管理</h1>
+            <h1 class="page-title" th:text="#{borrow.title}">Borrow Management</h1>
             <div class="table-actions">
                 <form th:action="@{/borrow/overdue-scan}" method="post">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                    <button class="layui-btn layui-btn-primary" type="submit" th:text="#{borrow.overdueScan}">逾期扫描</button>
+                    <button class="layui-btn layui-btn-primary" type="submit" th:text="#{borrow.overdueScan}">Overdue Scan</button>
                 </form>
             </div>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
 
-        <section class="borrow-command-bar" id="borrowCommandBar" aria-label="借还书快捷操作">
+        <section class="borrow-command-bar" id="borrowCommandBar" aria-label="Borrow workstation shortcuts">
             <button class="command-button active" type="button" data-command="borrow">
-                <span th:text="#{borrow.scanBorrow}">扫码借书</span><kbd>F2</kbd>
+                <span th:text="#{borrow.scanBorrow}">Scan Borrow</span><kbd>F2</kbd>
             </button>
             <button class="command-button" type="button" data-command="return">
-                <span th:text="#{borrow.scanReturn}">扫码还书</span><kbd>F3</kbd>
+                <span th:text="#{borrow.scanReturn}">Scan Return</span><kbd>F3</kbd>
             </button>
             <button class="command-button" type="button" data-command="renew">
-                <span th:text="#{borrow.quickRenew}">快速续借</span><kbd>F4</kbd>
+                <span th:text="#{borrow.quickRenew}">Quick Renew</span><kbd>F4</kbd>
             </button>
-            <span class="command-status" id="borrowCommandStatus" th:text="#{borrow.ready}">准备就绪</span>
+            <span class="command-status" id="borrowCommandStatus" th:text="#{borrow.ready}">Ready</span>
         </section>
 
         <section class="scan-desk" id="scanDesk">
             <article class="panel scan-panel" data-panel="borrow">
                 <div class="panel-heading">
-                    <h2 th:text="#{borrow.scanBorrow}">扫码借书</h2>
-                    <span class="status-pill" id="borrowFlowState" th:text="#{borrow.waitReader}">等待读者</span>
+                    <h2 th:text="#{borrow.scanBorrow}">Scan Borrow</h2>
+                    <span class="status-pill" id="borrowFlowState" th:text="#{borrow.waitReader}">Waiting reader</span>
                 </div>
                 <div class="scan-fields two-columns">
                     <label class="scan-field">
-                        <span th:text="#{borrow.readerNo}">读者证号</span>
+                        <span th:text="#{borrow.readerNo}">Reader No</span>
                         <input class="layui-input scan-input" id="borrowReaderNo" autocomplete="off" th:placeholder="#{borrow.readerNo.placeholder}">
                     </label>
                     <label class="scan-field">
-                        <span th:text="#{borrow.bookIsbn}">图书 ISBN</span>
+                        <span th:text="#{borrow.bookIsbn}">Book ISBN</span>
                         <input class="layui-input scan-input" id="borrowBookIsbn" autocomplete="off" th:placeholder="#{borrow.bookIsbn.placeholder}" disabled>
                     </label>
                 </div>
                 <div class="scan-status-grid">
-                    <div class="scan-status empty" id="readerStatus" th:text="#{borrow.waitReaderScan}">等待读者扫描</div>
-                    <div class="scan-status empty" id="bookStatus" th:text="#{borrow.waitBookScan}">等待图书扫描</div>
+                    <div class="scan-status empty" id="readerStatus" th:text="#{borrow.waitReaderScan}">Waiting reader scan</div>
+                    <div class="scan-status empty" id="bookStatus" th:text="#{borrow.waitBookScan}">Waiting book scan</div>
                 </div>
                 <div class="desk-actions">
-                    <button class="layui-btn" type="button" id="borrowSubmit" disabled th:text="#{borrow.checkout}">借出</button>
-                    <button class="layui-btn layui-btn-primary" type="button" id="borrowReset" th:text="#{borrow.clear}">清空</button>
+                    <button class="layui-btn" type="button" id="borrowSubmit" disabled th:text="#{borrow.checkout}">Checkout</button>
+                    <button class="layui-btn layui-btn-primary" type="button" id="borrowReset" th:text="#{borrow.clear}">Clear</button>
                 </div>
             </article>
 
             <article class="panel scan-panel" data-panel="return">
                 <div class="panel-heading">
-                    <h2 th:text="#{borrow.scanReturn}">扫码还书</h2>
-                    <span class="status-pill" id="returnModeBadge" th:text="#{borrow.normalReturn}">正常归还</span>
+                    <h2 th:text="#{borrow.scanReturn}">Scan Return</h2>
+                    <span class="status-pill" id="returnModeBadge" th:text="#{borrow.normalReturn}">Normal Return</span>
                 </div>
                 <label class="scan-field">
-                    <span th:text="#{borrow.bookIsbn}">图书 ISBN</span>
+                    <span th:text="#{borrow.bookIsbn}">Book ISBN</span>
                     <input class="layui-input scan-input" id="returnBookIsbn" autocomplete="off" th:placeholder="#{borrow.returnIsbn.placeholder}">
                 </label>
                 <div class="queue-list" id="returnQueue">
-                    <div class="queue-empty" th:text="#{borrow.returnQueue.empty}">待还队列为空</div>
+                    <div class="queue-empty" th:text="#{borrow.returnQueue.empty}">Return queue is empty</div>
                 </div>
-                <div class="queue-summary" id="returnSummary" th:text="#{borrow.returnSummary}">待还 0 本，预计罚款 0.00</div>
+                <div class="queue-summary" id="returnSummary" th:text="#{borrow.returnSummary}">0 books pending, estimated fine 0.00</div>
                 <div class="desk-actions">
-                    <button class="layui-btn layui-btn-normal" type="button" id="returnBatch" disabled th:text="#{borrow.batchReturn}">批量归还</button>
-                    <button class="layui-btn layui-btn-primary" type="button" id="returnClear" th:text="#{borrow.clearQueue}">清空队列</button>
+                    <button class="layui-btn layui-btn-normal" type="button" id="returnBatch" disabled th:text="#{borrow.batchReturn}">Batch Return</button>
+                    <button class="layui-btn layui-btn-primary" type="button" id="returnClear" th:text="#{borrow.clearQueue}">Clear Queue</button>
                 </div>
-                <div class="shortcut-line" th:text="#{borrow.shortcutHint}">Alt+D 标记损坏，Alt+L 标记丢失</div>
+                <div class="shortcut-line" th:text="#{borrow.shortcutHint}">Alt+D marks damaged, Alt+L marks lost</div>
             </article>
 
             <article class="panel scan-panel" data-panel="renew">
                 <div class="panel-heading">
-                    <h2 th:text="#{borrow.quickRenew}">快速续借</h2>
-                    <span class="status-pill" th:text="#{borrow.scanAndRenew}">扫描即续借</span>
+                    <h2 th:text="#{borrow.quickRenew}">Quick Renew</h2>
+                    <span class="status-pill" th:text="#{borrow.scanAndRenew}">Scan to renew</span>
                 </div>
                 <label class="scan-field">
-                    <span th:text="#{borrow.bookIsbn}">图书 ISBN</span>
+                    <span th:text="#{borrow.bookIsbn}">Book ISBN</span>
                     <input class="layui-input scan-input" id="renewBookIsbn" autocomplete="off" th:placeholder="#{borrow.bookIsbn.placeholder}">
                 </label>
-                <div class="scan-status empty" id="renewStatus" th:text="#{borrow.waitBookScan}">等待续借图书扫描</div>
+                <div class="scan-status empty" id="renewStatus" th:text="#{borrow.waitBookScan}">Waiting book scan</div>
                 <div class="desk-actions">
-                    <button class="layui-btn" type="button" id="renewSubmit" th:text="#{borrow.renew}">续借</button>
+                    <button class="layui-btn" type="button" id="renewSubmit" th:text="#{borrow.renew}">Renew</button>
                 </div>
             </article>
         </section>
@@ -134,57 +135,78 @@
 
         <section class="panel">
             <div class="table-toolbar">
-                <h2 class="section-title" th:text="#{borrow.recordList}">借阅记录</h2>
+                <div>
+                    <h2 class="section-title" th:text="#{borrow.recordList}">Borrow Records</h2>
+                    <span class="hint" th:text="#{borrow.keyword.placeholder}">Book / ISBN / Reader</span>
+                </div>
+                <div class="toolbar-actions">
+                    <form class="reservation-filter" th:action="@{/borrow}" method="get">
+                        <select class="layui-select" name="status">
+                            <option value="" th:selected="${status == null}" th:text="#{borrow.status.all}">All statuses</option>
+                            <option th:each="item : ${statuses}"
+                                    th:value="${item.name()}"
+                                    th:selected="${status != null and status == item}"
+                                    th:text="${#messages.msg('borrowStatus.' + item.name())}"></option>
+                        </select>
+                        <input class="layui-input" name="keyword" th:value="${keyword}" th:placeholder="#{borrow.keyword.placeholder}">
+                        <button class="layui-btn" type="submit" th:text="#{common.search}">Search</button>
+                        <a class="layui-btn layui-btn-primary" th:href="@{/borrow}" th:text="#{common.reset}">Reset</a>
+                    </form>
+                    <a class="layui-btn layui-btn-primary"
+                       th:href="@{/borrow/export(status=${status}, keyword=${keyword})}"
+                       th:text="#{common.exportCsv}">Export CSV</a>
+                </div>
             </div>
             <table class="layui-table responsive-table">
                 <thead>
                 <tr>
-                    <th th:text="#{borrow.book}">图书</th>
-                    <th th:text="#{borrow.reader}">读者</th>
-                    <th th:text="#{borrow.borrowDate}">借出日期</th>
-                    <th th:text="#{borrow.dueDate}">应还日期</th>
-                    <th th:text="#{borrow.returnDate}">归还日期</th>
-                    <th th:text="#{common.status}">状态</th>
-                    <th th:text="#{borrow.fine}">罚款</th>
-                    <th th:text="#{common.operation}">操作</th>
+                    <th th:text="#{borrow.book}">Book</th>
+                    <th th:text="#{borrow.reader}">Reader</th>
+                    <th th:text="#{borrow.borrowDate}">Borrow Date</th>
+                    <th th:text="#{borrow.dueDate}">Due Date</th>
+                    <th th:text="#{borrow.returnDate}">Return Date</th>
+                    <th th:text="#{common.status}">Status</th>
+                    <th th:text="#{borrow.fine}">Fine</th>
+                    <th th:text="#{common.operation}">Actions</th>
                 </tr>
                 </thead>
                 <tbody id="borrowRecordBody">
                 <tr th:each="record : ${records.content}" th:attr="data-record-id=${record.id},data-record-status=${record.status.name()}">
-                    <td data-cell="book" th:text="${record.book.title}"></td>
-                    <td data-cell="reader" th:text="${record.reader.readerNo + ' ' + record.reader.name}"></td>
-                    <td data-cell="borrowDate" th:text="${record.borrowDate}"></td>
-                    <td data-cell="dueDate" th:text="${record.dueDate}"></td>
-                    <td data-cell="returnDate" th:text="${record.returnDate ?: '-'}"></td>
+                    <td data-cell="book" th:text="${record.book.title}">Book</td>
+                    <td data-cell="reader" th:text="${record.reader.readerNo + ' ' + record.reader.name}">Reader</td>
+                    <td data-cell="borrowDate" th:text="${record.borrowDate}">Borrow Date</td>
+                    <td data-cell="dueDate" th:text="${record.dueDate}">Due Date</td>
+                    <td data-cell="returnDate" th:text="${record.returnDate ?: '-'}">Return Date</td>
                     <td data-cell="status">
                         <span class="status-chip"
                               th:classappend="${' status-' + record.status.name().toLowerCase()}"
                               th:text="${#messages.msg('borrowStatus.' + record.status.name())}">Status</span>
                     </td>
-                    <td data-cell="fine" th:text="${record.fineAmount}"></td>
+                    <td data-cell="fine" th:text="${record.fineAmount}">0.00</td>
                     <td class="table-actions" data-cell="actions">
                         <button th:if="${record.status.name() == 'BORROWED'}"
                                 class="layui-btn layui-btn-xs"
                                 type="button"
                                 data-row-action="renew"
                                 th:attr="data-record-id=${record.id}">
-                            <span th:text="#{borrow.renew}">续借</span>
+                            <span th:text="#{borrow.renew}">Renew</span>
                         </button>
                         <button th:if="${record.status.name() == 'BORROWED' || record.status.name() == 'OVERDUE'}"
                                 class="layui-btn layui-btn-xs layui-btn-normal"
                                 type="button"
                                 data-row-action="return"
                                 th:attr="data-record-id=${record.id}">
-                            <span th:text="#{borrow.return}">归还</span>
+                            <span th:text="#{borrow.return}">Return</span>
                         </button>
                     </td>
                 </tr>
                 </tbody>
             </table>
+            <div class="empty-result" th:if="${records.totalElements == 0}" th:text="#{borrow.empty}">No borrow records found.</div>
             <div class="table-actions">
-                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${records.hasPrevious()}" th:href="@{/borrow(page=${records.number - 1}, size=${pageSize})}" th:text="#{common.previous}">上一页</a>
-                <span th:text="|${records.number + 1} / ${records.totalPages == 0 ? 1 : records.totalPages}|"></span>
-                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${records.hasNext()}" th:href="@{/borrow(page=${records.number + 1}, size=${pageSize})}" th:text="#{common.next}">下一页</a>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${records.hasPrevious()}" th:href="@{|/borrow?page=${records.number - 1}${queryString}|}" th:text="#{common.previous}">Previous</a>
+                <span th:text="|${records.number + 1} / ${records.totalPages == 0 ? 1 : records.totalPages}|">1 / 1</span>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${records.hasNext()}" th:href="@{|/borrow?page=${records.number + 1}${queryString}|}" th:text="#{common.next}">Next</a>
             </div>
         </section>
     </main>

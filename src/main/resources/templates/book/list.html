@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="|#{book.search.title} - #{app.name}|">图书检索 - 图书管理系统</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -14,7 +15,8 @@
         <div class="topbar">
             <h1 class="page-title" th:text="#{book.search.title}">图书检索</h1>
             <div class="table-actions">
-                <a class="layui-btn layui-btn-primary" th:href="@{/books/export}" sec:authorize="hasAuthority('BOOK_VIEW')" th:text="#{common.exportCsv}">导出CSV</a>
+                <a class="layui-btn layui-btn-primary" th:href="@{/books/trash}" sec:authorize="hasAuthority('BOOK_DELETE')" th:text="#{book.trash}">Trash</a>
+                <a class="layui-btn layui-btn-primary" th:href="@{|/books/export${exportQueryString}|}" sec:authorize="hasAuthority('BOOK_VIEW')" th:text="#{common.exportCsv}">导出CSV</a>
                 <a class="layui-btn" th:href="@{/books/new}" sec:authorize="hasAuthority('BOOK_EDIT')" th:text="#{book.add}">新增图书</a>
             </div>
         </div>
@@ -61,6 +63,15 @@
                                 <label th:each="category : ${categories}">
                                     <input type="checkbox" name="categoryIds" th:value="${category.id}" th:checked="${criteria.categoryIds.contains(category.id)}">
                                     <span th:text="${@localizedTextService.categoryName(category)}"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="condition-row category-condition">
+                            <span th:text="#{book.tags}">Tags</span>
+                            <div class="category-checks">
+                                <label th:each="tag : ${tags}">
+                                    <input type="checkbox" name="tagIds" th:value="${tag.id}" th:checked="${criteria.tagIds.contains(tag.id)}">
+                                    <span th:text="${tag.name}"></span>
                                 </label>
                             </div>
                         </div>
@@ -139,6 +150,16 @@
             <div class="table-toolbar">
                 <h2 class="section-title" th:text="#{book.resultCount(${books.totalElements})}">检索结果</h2>
                 <span class="hint" th:text="#{book.pinyinHint}">快速搜索支持分类拼音首字母，例如输入 jsj 可匹配“计算机”。</span>
+                <form id="bookBatchForm"
+                      class="table-actions batch-actions"
+                      th:action="@{/books/batch-delete}"
+                      method="post"
+                      th:if="${criteria.view == 'list'}"
+                      th:attr="onsubmit=|return confirm('#{book.confirmBatchDelete}')|"
+                      sec:authorize="hasAuthority('BOOK_DELETE')">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                    <button class="layui-btn layui-btn-sm layui-btn-danger" type="submit" th:text="#{common.batchDelete}">批量删除</button>
+                </form>
             </div>
 
             <div class="book-card-grid" th:if="${criteria.view == 'card'}">
@@ -153,6 +174,9 @@
                         <div class="book-meta">
                             <span th:text="${book.category != null ? @localizedTextService.categoryName(book.category) : #messages.msg('common.unclassified')}"></span>
                             <span th:text="${book.publishDate != null ? #temporals.format(book.publishDate, 'yyyy') : #messages.msg('book.yearUnknown')}"></span>
+                        </div>
+                        <div class="tag-row" th:if="${!book.tags.isEmpty()}">
+                            <span class="tag-chip" th:each="tag : ${book.tags}" th:text="${tag.name}">Tag</span>
                         </div>
                         <div class="availability" th:classappend="${book.availableQuantity > 0 ? ' available' : ' unavailable'}" th:text="${book.availableQuantity > 0 ? #messages.msg('book.available', book.availableQuantity, book.totalQuantity) : #messages.msg('book.unavailable')}"></div>
                         <div class="book-location" th:text="${book.location ?: #messages.msg('book.locationUnknown')}"></div>
@@ -170,13 +194,15 @@
             </div>
 
             <table class="layui-table responsive-table" th:if="${criteria.view == 'list'}">
-                <thead><tr><th th:text="#{book.title}">书名</th><th th:text="#{book.isbn}">ISBN</th><th th:text="#{book.author}">作者</th><th th:text="#{book.category}">分类</th><th th:text="#{book.publishYear}">出版年份</th><th th:text="#{book.inventory}">库存</th><th th:text="#{book.location}">位置</th><th th:text="#{common.operation}">操作</th></tr></thead>
+                <thead><tr><th sec:authorize="hasAuthority('BOOK_DELETE')"><input type="checkbox" id="selectAllBooks" th:title="#{common.selectAll}"></th><th th:text="#{book.title}">书名</th><th th:text="#{book.isbn}">ISBN</th><th th:text="#{book.author}">作者</th><th th:text="#{book.category}">分类</th><th th:text="#{book.tags}">Tags</th><th th:text="#{book.publishYear}">出版年份</th><th th:text="#{book.inventory}">库存</th><th th:text="#{book.location}">位置</th><th th:text="#{common.operation}">操作</th></tr></thead>
                 <tbody>
                 <tr th:each="book : ${books.content}">
+                    <td sec:authorize="hasAuthority('BOOK_DELETE')"><input type="checkbox" form="bookBatchForm" name="ids" th:value="${book.id}" th:title="${book.title}"></td>
                     <td th:text="${book.title}"></td>
                     <td th:text="${book.isbn}"></td>
                     <td th:text="${book.author}"></td>
                     <td th:text="${book.category != null ? @localizedTextService.categoryName(book.category) : '-'}"></td>
+                    <td><span class="tag-chip" th:each="tag : ${book.tags}" th:text="${tag.name}">Tag</span><span th:if="${book.tags.isEmpty()}">-</span></td>
                     <td th:text="${book.publishDate != null ? #temporals.format(book.publishDate, 'yyyy') : '-'}"></td>
                     <td th:text="${book.availableQuantity + '/' + book.totalQuantity}"></td>
                     <td th:text="${book.location}"></td>
@@ -210,6 +236,7 @@
                             <div><dt th:text="#{book.isbn}">ISBN</dt><dd th:text="${book.isbn}"></dd></div>
                             <div><dt th:text="#{book.publisher}">出版社</dt><dd th:text="${book.publisher}"></dd></div>
                             <div><dt th:text="#{book.category}">分类</dt><dd th:text="${book.category != null ? @localizedTextService.categoryName(book.category) : '-'}"></dd></div>
+                            <div><dt th:text="#{book.tags}">Tags</dt><dd><span class="tag-chip" th:each="tag : ${book.tags}" th:text="${tag.name}">Tag</span><span th:if="${book.tags.isEmpty()}">-</span></dd></div>
                             <div><dt th:text="#{book.publishDate}">出版日期</dt><dd th:text="${book.publishDate ?: '-'}"></dd></div>
                             <div><dt th:text="#{book.borrowHot}">借阅热度</dt><dd th:text="${book.borrowCount}"></dd></div>
                             <div><dt th:text="#{book.availableQuantity}">可借库存</dt><dd th:text="${book.availableQuantity + '/' + book.totalQuantity}"></dd></div>
@@ -254,5 +281,15 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/layui.min.js"></script>
 <script th:src="@{/js/book-search.js}"></script>
+<script>
+    const selectAllBooks = document.getElementById('selectAllBooks');
+    if (selectAllBooks) {
+        selectAllBooks.addEventListener('change', () => {
+            document.querySelectorAll('input[name="ids"][form="bookBatchForm"]').forEach(item => {
+                item.checked = selectAllBooks.checked;
+            });
+        });
+    }
+</script>
 </body>
 </html>

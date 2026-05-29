@@ -15,7 +15,7 @@
 - 移动端适配：侧边栏、工具栏、表格和导入控件的响应式布局
 - 罚款管理：缴纳、减免
 - 数据看板、系统配置、操作日志
-- 默认使用本地 MySQL 数据库存储
+- 默认使用本地 H2 内存库快速启动，MySQL 通过环境变量切换
 - 国际化支持：简体中文、繁體中文、英文界面切换，业务枚举和分类字段支持多语言显示
 
 ## 技术栈
@@ -33,6 +33,7 @@
 
 ```bash
 mvn clean package
+set LMS_BOOTSTRAP_ADMIN_PASSWORD=your-strong-password
 java -jar target/library-management-system.jar
 ```
 
@@ -42,12 +43,14 @@ java -jar target/library-management-system.jar
 http://localhost:8090
 ```
 
-默认账号：
+首次启动会创建一个 bootstrap 管理员。生产或共享环境请提前设置密码：
 
-```text
-admin / admin123
-librarian / librarian123
+```bash
+set LMS_BOOTSTRAP_ADMIN_PASSWORD=your-strong-password
+java -jar target/library-management-system.jar
 ```
+
+如果启用 bootstrap 管理员或 demo 种子数据，必须通过环境变量显式配置 `LMS_BOOTSTRAP_ADMIN_PASSWORD` 和 `LMS_DEMO_PASSWORD`。系统不会生成或在日志中输出临时密码，避免凭证泄露。
 
 ## 国际化扩展
 
@@ -64,10 +67,12 @@ librarian / librarian123
 CREATE DATABASE library_management_system DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-确认 `src/main/resources/application.yml` 中的 MySQL 账号密码可连接本地数据库，然后运行：
+使用 MySQL 时启用 `mysql` profile，并通过环境变量提供连接凭证：
 
 ```bash
-java -jar target/library-management-system.jar
+set LMS_MYSQL_USERNAME=your-db-user
+set LMS_MYSQL_PASSWORD=your-db-password
+java -jar target/library-management-system.jar --spring.profiles.active=mysql
 ```
 
 ## 后续计划

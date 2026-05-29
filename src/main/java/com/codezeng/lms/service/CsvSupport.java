@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-final class CsvSupport {
+public final class CsvSupport {
 
     private CsvSupport() {
     }
@@ -21,21 +21,38 @@ final class CsvSupport {
 
     static List<String[]> readRows(byte[] bytes) throws IOException {
         List<String[]> rows = new ArrayList<>();
+        StringBuilder record = new StringBuilder();
+        int recordStartLine = 1;
+        int lineNumber = 0;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(bytes), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
+                lineNumber++;
                 if (line.startsWith("\uFEFF")) {
                     line = line.substring(1);
                 }
-                if (!line.isBlank()) {
-                    rows.add(parseLine(line));
+                if (record.isEmpty()) {
+                    recordStartLine = lineNumber;
+                } else {
+                    record.append('\n');
+                }
+                record.append(line);
+                if (!hasOpenQuote(record)) {
+                    String completeRecord = record.toString();
+                    record.setLength(0);
+                    if (!completeRecord.isBlank()) {
+                        rows.add(parseLine(completeRecord));
+                    }
                 }
             }
+        }
+        if (!record.isEmpty()) {
+            throw new IllegalArgumentException("CSV row starting at line " + recordStartLine + " has an unclosed quoted field.");
         }
         return rows;
     }
 
-    static String csv(String value) {
+    public static String csv(String value) {
         String safeValue = value == null ? "" : value;
         return "\"" + safeValue.replace("\"", "\"\"") + "\"";
     }
@@ -62,5 +79,20 @@ final class CsvSupport {
         }
         values.add(current.toString().trim());
         return values.toArray(String[]::new);
+    }
+
+    private static boolean hasOpenQuote(CharSequence text) {
+        boolean quoted = false;
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '"') {
+                if (quoted && i + 1 < text.length() && text.charAt(i + 1) == '"') {
+                    i++;
+                } else {
+                    quoted = !quoted;
+                }
+            }
+        }
+        return quoted;
     }
 }

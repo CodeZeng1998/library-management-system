@@ -10,6 +10,10 @@ import com.codezeng.lms.repository.BorrowRecordRepository;
 import com.codezeng.lms.repository.ReaderRepository;
 import com.codezeng.lms.repository.ReservationRecordRepository;
 import com.codezeng.lms.security.DataScopeService;
+import com.codezeng.lms.service.CsvSupport;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -17,6 +21,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.WeekFields;
@@ -55,6 +60,42 @@ public class HomeController {
 
     @GetMapping("/")
     public String index(Model model) {
+        DashboardSnapshot snapshot = dashboardSnapshot();
+        model.addAttribute("bookCount", snapshot.bookCount());
+        model.addAttribute("readerCount", snapshot.readerCount());
+        model.addAttribute("activeBorrowCount", snapshot.activeBorrowCount());
+        model.addAttribute("reservationCount", snapshot.reservationCount());
+        model.addAttribute("overdueCount", snapshot.overdueCount());
+        model.addAttribute("topBooks", snapshot.topBooks());
+        model.addAttribute("recentBooks", snapshot.recentBooks());
+        model.addAttribute("overdueRecords", snapshot.overdueRecords());
+        model.addAttribute("borrowTrend", snapshot.borrowTrend());
+        model.addAttribute("borrowTrendDaily", snapshot.borrowTrendDaily());
+        model.addAttribute("borrowTrendWeekly", snapshot.borrowTrendWeekly());
+        model.addAttribute("borrowTrendMonthly", snapshot.borrowTrendMonthly());
+        model.addAttribute("categoryShare", snapshot.categoryShare());
+        model.addAttribute("shelfHeatmap", snapshot.shelfHeatmap());
+        model.addAttribute("readerActivity", snapshot.readerActivity());
+        model.addAttribute("overdueRateTrend", snapshot.overdueRateTrend());
+        model.addAttribute("newBookImpact", snapshot.newBookImpact());
+        return "index";
+    }
+
+    @GetMapping("/dashboard/export")
+    public ResponseEntity<byte[]> exportDashboard() {
+        String csv = dashboardCsv(dashboardSnapshot());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=dashboard-snapshot.csv")
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .body(csv.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @GetMapping("/login")
+    public String login() {
+        return "login";
+    }
+
+    private DashboardSnapshot dashboardSnapshot() {
         List<Book> heatmapBooks = bookRepository.findAll(
                 dataScopeService.bookScope(),
                 PageRequest.of(0, 120, Sort.by(Sort.Direction.DESC, "borrowCount"))).getContent();
@@ -63,31 +104,50 @@ public class HomeController {
         List<BorrowRecord> overdueRecords = borrowRecordRepository
                 .findAll(overdueSpec(), PageRequest.of(0, 8, Sort.by("dueDate"))).getContent();
 
-        model.addAttribute("bookCount", bookRepository.count(dataScopeService.bookScope()));
-        model.addAttribute("readerCount", readerRepository.countByDeletedFalse());
-        model.addAttribute("activeBorrowCount", activeBorrowCount);
-        model.addAttribute("reservationCount", reservationRecordRepository.count(dataScopeService.reservationScope()
-                .and((root, query, builder) -> root.get("status").in(List.of(ReservationStatus.WAITING, ReservationStatus.NOTIFIED)))));
-        model.addAttribute("topBooks", bookRepository.findAll(
-                dataScopeService.bookScope(),
-                PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "borrowCount"))).getContent());
-        model.addAttribute("recentBooks", bookRepository.findAll(dataScopeService.bookScope(), PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "createTime"))).getContent());
-        model.addAttribute("overdueRecords", overdueRecords);
-        model.addAttribute("borrowTrend", borrowTrend(recentRecords));
-        model.addAttribute("borrowTrendDaily", borrowTrendByDay(recentRecords));
-        model.addAttribute("borrowTrendWeekly", borrowTrendByWeek(recentRecords));
-        model.addAttribute("borrowTrendMonthly", borrowTrendByMonth(recentRecords));
-        model.addAttribute("categoryShare", categoryShare(heatmapBooks, recentRecords));
-        model.addAttribute("shelfHeatmap", shelfHeatmap(heatmapBooks, recentRecords));
-        model.addAttribute("readerActivity", readerActivityDistribution(recentRecords));
-        model.addAttribute("overdueRateTrend", overdueRateTrend(recentRecords));
-        model.addAttribute("newBookImpact", newBookImpact(heatmapBooks, recentRecords));
-        return "index";
+        return new DashboardSnapshot(
+                bookRepository.count(dataScopeService.bookScope()),
+                readerRepository.countByDeletedFalse(),
+                activeBorrowCount,
+                reservationRecordRepository.count(dataScopeService.reservationScope()
+                        .and((root, query, builder) -> root.get("status").in(List.of(ReservationStatus.WAITING, ReservationStatus.NOTIFIED)))),
+                overdueRecords.size(),
+                bookRepository.findAll(
+                        dataScopeService.bookScope(),
+                        PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "borrowCount"))).getContent(),
+                bookRepository.findAll(dataScopeService.bookScope(), PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "createTime"))).getContent(),
+                overdueRecords,
+                borrowTrend(recentRecords),
+                borrowTrendByDay(recentRecords),
+                borrowTrendByWeek(recentRecords),
+                borrowTrendByMonth(recentRecords),
+                categoryShare(heatmapBooks, recentRecords),
+                shelfHeatmap(heatmapBooks, recentRecords),
+                readerActivityDistribution(recentRecords),
+                overdueRateTrend(recentRecords),
+                newBookImpact(heatmapBooks, recentRecords));
     }
 
-    @GetMapping("/login")
-    public String login() {
-        return "login";
+    private String dashboardCsv(DashboardSnapshot snapshot) {
+        StringBuilder csv = new StringBuilder("\uFEFFSection,Metric,Value,Extra\n");
+        appendMetric(csv, "Summary", "Books", snapshot.bookCount(), "");
+        appendMetric(csv, "Summary", "Readers", snapshot.readerCount(), "");
+        appendMetric(csv, "Summary", "Active Loans", snapshot.activeBorrowCount(), "");
+        appendMetric(csv, "Summary", "Active Reservations", snapshot.reservationCount(), "");
+        appendMetric(csv, "Summary", "Overdue Items", snapshot.overdueCount(), "");
+        snapshot.borrowTrendDaily().forEach(point -> appendMetric(csv, "Borrow Trend Daily", point.label(), point.value(), ""));
+        snapshot.categoryShare().forEach(item -> appendMetric(csv, "Category Share", item.label(), item.value(), ""));
+        snapshot.readerActivity().forEach(item -> appendMetric(csv, "Reader Activity", item.label(), item.value(), ""));
+        snapshot.shelfHeatmap().forEach(point -> appendMetric(csv, "Shelf Heatmap", point.area() + " " + point.shelf(), point.borrowCount(), "Turnover " + point.turnoverRate()));
+        snapshot.overdueRateTrend().forEach(point -> appendMetric(csv, "Overdue Rate", point.label(), point.rate(), point.overdue() + "/" + point.total()));
+        snapshot.newBookImpact().forEach(point -> appendMetric(csv, "New Book Impact", point.label(), point.newBooks(), "Borrows " + point.borrows()));
+        return csv.toString();
+    }
+
+    private void appendMetric(StringBuilder csv, String section, String metric, Object value, String extra) {
+        csv.append(CsvSupport.csv(section)).append(',')
+                .append(CsvSupport.csv(metric)).append(',')
+                .append(CsvSupport.csv(String.valueOf(value))).append(',')
+                .append(CsvSupport.csv(extra)).append('\n');
     }
 
     private List<BorrowRecord> recentDashboardRecords() {
@@ -310,5 +370,25 @@ public class HomeController {
     }
 
     public record NewBookImpactPoint(String label, long newBooks, long borrows) {
+    }
+
+    private record DashboardSnapshot(
+            long bookCount,
+            long readerCount,
+            long activeBorrowCount,
+            long reservationCount,
+            long overdueCount,
+            List<Book> topBooks,
+            List<Book> recentBooks,
+            List<BorrowRecord> overdueRecords,
+            List<DashboardPoint> borrowTrend,
+            List<DashboardPoint> borrowTrendDaily,
+            List<DashboardPoint> borrowTrendWeekly,
+            List<DashboardPoint> borrowTrendMonthly,
+            List<DashboardItem> categoryShare,
+            List<ShelfHeatPoint> shelfHeatmap,
+            List<DashboardItem> readerActivity,
+            List<DashboardRatePoint> overdueRateTrend,
+            List<NewBookImpactPoint> newBookImpact) {
     }
 }

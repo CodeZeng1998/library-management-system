@@ -10,6 +10,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.util.StringUtils;
+
+import java.util.UUID;
 
 @Configuration
 @EnableMethodSecurity
@@ -19,12 +22,16 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             DatabaseUserDetailsService userDetailsService,
-            @Value("${app.security.remember-me-key}") String rememberMeKey) throws Exception {
+            @Value("${app.security.remember-me-key:}") String rememberMeKey) throws Exception {
+        String effectiveRememberMeKey = StringUtils.hasText(rememberMeKey)
+                ? rememberMeKey
+                : UUID.randomUUID().toString();
         http
                 .userDetailsService(userDetailsService)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/register", "/h2-console/**").permitAll()
                         .requestMatchers("/users/**").hasAuthority("USER_MANAGE")
+                        .requestMatchers("/categories/**").hasAuthority("CATEGORY_MANAGE")
                         .requestMatchers("/system/configs/**").hasAuthority("CONFIG_MANAGE")
                         .requestMatchers("/system/logs/**").hasAuthority("LOG_VIEW")
                         .requestMatchers("/recommendations/**").hasAuthority("RECOMMENDATION_VIEW")
@@ -47,7 +54,7 @@ public class SecurityConfig {
                         .permitAll()
                 )
                 .rememberMe(remember -> remember
-                        .key(rememberMeKey)
+                        .key(effectiveRememberMeKey)
                         .tokenValiditySeconds(7 * 24 * 60 * 60)
                         .userDetailsService(userDetailsService)
                 )

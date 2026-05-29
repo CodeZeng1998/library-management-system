@@ -5,7 +5,7 @@
     <div class="brand" th:text="#{app.name}">Library Management System</div>
     <details class="sidebar-settings">
         <summary class="settings-button">
-            <span class="settings-icon" aria-hidden="true">&#9881;</span>
+            <i class="settings-icon" data-lucide="settings" aria-hidden="true"></i>
             <span th:text="#{settings.label}">Settings</span>
         </summary>
         <div class="settings-menu">
@@ -35,18 +35,21 @@
             </div>
         </div>
     </details>
-    <a class="nav-link" th:href="@{/}" sec:authorize="hasAuthority('DASHBOARD_VIEW')" th:text="#{nav.dashboard}">Dashboard</a>
-    <a class="nav-link" th:href="@{/portal}" sec:authorize="hasAuthority('ROLE_READER')" th:text="#{nav.portal}">Reader Portal</a>
-    <a class="nav-link" th:href="@{/recommendations}" sec:authorize="hasAuthority('RECOMMENDATION_VIEW')" th:text="#{nav.recommendations}">Recommendations</a>
-    <a class="nav-link" th:href="@{/books}" sec:authorize="hasAuthority('BOOK_VIEW')" th:text="#{nav.books}">Books</a>
-    <a class="nav-link" th:href="@{/readers}" sec:authorize="hasAuthority('READER_VIEW')" th:text="#{nav.readers}">Readers</a>
-    <a class="nav-link" th:href="@{/borrow}" sec:authorize="hasAuthority('BORROW_MANAGE')" th:text="#{nav.borrow}">Circulation</a>
-    <a class="nav-link" th:href="@{/reservations}" sec:authorize="hasAuthority('RESERVATION_MANAGE')" th:text="#{nav.reservations}">Reservations</a>
-    <a class="nav-link" th:href="@{/notifications}" sec:authorize="hasAuthority('NOTIFICATION_VIEW')" th:text="#{nav.notifications}">Messages</a>
-    <a class="nav-link" th:href="@{/fines}" sec:authorize="hasAuthority('FINE_VIEW')" th:text="#{nav.fines}">Fines</a>
-    <a class="nav-link" th:href="@{/users}" sec:authorize="hasAuthority('USER_MANAGE')" th:text="#{nav.users}">Users</a>
-    <a class="nav-link" th:href="@{/system/configs}" sec:authorize="hasAuthority('CONFIG_MANAGE')" th:text="#{nav.configs}">System Config</a>
-    <a class="nav-link" th:href="@{/system/logs}" sec:authorize="hasAuthority('LOG_VIEW')" th:text="#{nav.logs}">Operation Logs</a>
+    <a class="nav-link" th:href="@{/}" sec:authorize="hasAuthority('DASHBOARD_VIEW')"><i class="nav-icon" data-lucide="layout-dashboard" aria-hidden="true"></i><span th:text="#{nav.dashboard}">Dashboard</span></a>
+    <a class="nav-link" th:href="@{/portal}" sec:authorize="hasAuthority('ROLE_READER')"><i class="nav-icon" data-lucide="door-open" aria-hidden="true"></i><span th:text="#{nav.portal}">Reader Portal</span></a>
+    <a class="nav-link" th:href="@{/recommendations}" sec:authorize="hasAuthority('RECOMMENDATION_VIEW')"><i class="nav-icon" data-lucide="sparkles" aria-hidden="true"></i><span th:text="#{nav.recommendations}">Recommendations</span></a>
+    <a class="nav-link" th:href="@{/books}" sec:authorize="hasAuthority('BOOK_VIEW')"><i class="nav-icon" data-lucide="book-open" aria-hidden="true"></i><span th:text="#{nav.books}">Books</span></a>
+    <a class="nav-link" th:href="@{/readers}" sec:authorize="hasAuthority('READER_VIEW')"><i class="nav-icon" data-lucide="users" aria-hidden="true"></i><span th:text="#{nav.readers}">Readers</span></a>
+    <a class="nav-link" th:href="@{/borrow}" sec:authorize="hasAuthority('BORROW_MANAGE')"><i class="nav-icon" data-lucide="scan-line" aria-hidden="true"></i><span th:text="#{nav.borrow}">Circulation</span></a>
+    <a class="nav-link" th:href="@{/reservations}" sec:authorize="hasAuthority('RESERVATION_MANAGE')"><i class="nav-icon" data-lucide="calendar-clock" aria-hidden="true"></i><span th:text="#{nav.reservations}">Reservations</span></a>
+    <a class="nav-link" th:href="@{/notifications}" sec:authorize="hasAuthority('NOTIFICATION_VIEW')"><i class="nav-icon" data-lucide="bell" aria-hidden="true"></i><span th:text="#{nav.notifications}">Messages</span></a>
+    <a class="nav-link" th:href="@{/fines}" sec:authorize="hasAuthority('FINE_VIEW')"><i class="nav-icon" data-lucide="badge-dollar-sign" aria-hidden="true"></i><span th:text="#{nav.fines}">Fines</span></a>
+    <a class="nav-link" th:href="@{/users}" sec:authorize="hasAuthority('USER_MANAGE')"><i class="nav-icon" data-lucide="shield" aria-hidden="true"></i><span th:text="#{nav.users}">Users</span></a>
+    <a class="nav-link" th:href="@{/categories}" sec:authorize="hasAuthority('CATEGORY_MANAGE')"><i class="nav-icon" data-lucide="folder-tree" aria-hidden="true"></i><span th:text="#{nav.categories}">Categories</span></a>
+    <a class="nav-link" th:href="@{/tags}" sec:authorize="hasAuthority('TAG_MANAGE')"><i class="nav-icon" data-lucide="tags" aria-hidden="true"></i><span th:text="#{nav.tags}">Tags</span></a>
+    <a class="nav-link" th:href="@{/system/configs}" sec:authorize="hasAuthority('CONFIG_MANAGE')"><i class="nav-icon" data-lucide="settings-2" aria-hidden="true"></i><span th:text="#{nav.configs}">System Config</span></a>
+    <a class="nav-link" th:href="@{/system/logs}" sec:authorize="hasAuthority('LOG_VIEW')"><i class="nav-icon" data-lucide="book-copy" aria-hidden="true"></i><span th:text="#{nav.logs}">Operation Logs</span></a>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
     <script th:src="@{/js/theme.js}"></script>
     <script th:src="@{/js/i18n.js}"></script>
     <script th:src="@{/js/density.js}"></script>

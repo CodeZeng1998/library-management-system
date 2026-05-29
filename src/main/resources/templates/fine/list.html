@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="|#{fine.title} - #{app.name}|">Fine Management - Library Management System</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -41,18 +42,24 @@
                     <h2 class="section-title" th:text="#{fine.filter}">Fine Filter</h2>
                     <span class="hint" th:text="#{fine.keyword.placeholder}">Reader / book / reason</span>
                 </div>
-                <form class="reservation-filter" th:action="@{/fines}" method="get">
-                    <select class="layui-select" name="status">
-                        <option value="" th:selected="${status == null}" th:text="#{fine.status.all}">All statuses</option>
-                        <option th:each="item : ${statuses}"
-                                th:value="${item.name()}"
-                                th:selected="${status != null and status == item}"
-                                th:text="${#messages.msg('fineStatus.' + item.name())}"></option>
-                    </select>
-                    <input class="layui-input" name="keyword" th:value="${keyword}" th:placeholder="#{fine.keyword.placeholder}">
-                    <button class="layui-btn" type="submit" th:text="#{common.search}">Search</button>
-                    <a class="layui-btn layui-btn-primary" th:href="@{/fines}" th:text="#{common.reset}">Reset</a>
-                </form>
+                <div class="toolbar-actions">
+                    <form class="reservation-filter" th:action="@{/fines}" method="get">
+                        <select class="layui-select" name="status">
+                            <option value="" th:selected="${status == null}" th:text="#{fine.status.all}">All statuses</option>
+                            <option th:each="item : ${statuses}"
+                                    th:value="${item.name()}"
+                                    th:selected="${status != null and status == item}"
+                                    th:text="${#messages.msg('fineStatus.' + item.name())}"></option>
+                        </select>
+                        <input class="layui-input" name="keyword" th:value="${keyword}" th:placeholder="#{fine.keyword.placeholder}">
+                        <button class="layui-btn" type="submit" th:text="#{common.search}">Search</button>
+                        <a class="layui-btn layui-btn-primary" th:href="@{/fines}" th:text="#{common.reset}">Reset</a>
+                    </form>
+                    <a class="layui-btn layui-btn-primary"
+                       sec:authorize="hasAuthority('FINE_VIEW')"
+                       th:href="@{/fines/export(status=${status}, keyword=${keyword})}"
+                       th:text="#{common.exportCsv}">Export CSV</a>
+                </div>
             </div>
 
             <table class="layui-table responsive-table">

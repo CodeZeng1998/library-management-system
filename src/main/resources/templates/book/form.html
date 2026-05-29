@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="|#{book.form.title} - #{app.name}|">图书表单 - 图书管理系统</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -15,6 +16,7 @@
             <h1 class="page-title" th:text="${book.id == null ? #messages.msg('book.form.add') : #messages.msg('book.form.edit')}">图书表单</h1>
             <a class="layui-btn layui-btn-primary" th:href="@{/books}" th:text="#{common.back}">返回</a>
         </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
         <section class="panel">
             <form class="layui-form" th:action="@{/books}" th:object="${book}" method="post">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
@@ -37,6 +39,16 @@
                                 <option value="" th:text="#{common.unclassified}">未分类</option>
                                 <option th:each="category : ${categories}" th:value="${category.id}" th:selected="${book.category != null and book.category.id == category.id}" th:text="${@localizedTextService.categoryName(category)}"></option>
                             </select>
+                        </div>
+                        <div class="form-full">
+                            <label th:text="#{book.tags}">Tags</label>
+                            <div class="category-checks">
+                                <label th:each="tag : ${tags}">
+                                    <input type="checkbox" name="tagIds" th:value="${tag.id}" th:checked="${book.tags.contains(tag)}">
+                                    <span th:text="${tag.name}">Tag</span>
+                                </label>
+                            </div>
+                            <input class="layui-input" name="tagNames" th:placeholder="#{book.tags.placeholder}">
                         </div>
                         <div><label th:text="#{book.location.storage}">存放位置</label><input class="layui-input" th:field="*{location}"></div>
                         <div><label th:text="#{book.totalQuantity}">馆藏数量</label><input class="layui-input" type="number" min="0" th:field="*{totalQuantity}" required></div>

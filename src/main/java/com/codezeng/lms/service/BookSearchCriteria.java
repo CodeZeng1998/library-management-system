@@ -11,6 +11,7 @@ public class BookSearchCriteria {
     private String author;
     private String authorMatch = "contains";
     private List<Long> categoryIds = new ArrayList<>();
+    private List<Long> tagIds = new ArrayList<>();
     private Integer publishYearFrom;
     private Integer publishYearTo;
     private boolean availableOnly;
@@ -64,6 +65,14 @@ public class BookSearchCriteria {
 
     public void setCategoryIds(List<Long> categoryIds) {
         this.categoryIds = categoryIds == null ? new ArrayList<>() : categoryIds;
+    }
+
+    public List<Long> getTagIds() {
+        return tagIds;
+    }
+
+    public void setTagIds(List<Long> tagIds) {
+        this.tagIds = tagIds == null ? new ArrayList<>() : tagIds;
     }
 
     public Integer getPublishYearFrom() {

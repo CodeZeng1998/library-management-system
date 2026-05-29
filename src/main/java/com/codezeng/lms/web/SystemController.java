@@ -1,6 +1,7 @@
 package com.codezeng.lms.web;
 
 import com.codezeng.lms.domain.OperationLog;
+import com.codezeng.lms.security.PreventDuplicateSubmit;
 import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.OperationLogQueryService;
 import com.codezeng.lms.service.SystemConfigService;
@@ -8,8 +9,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -50,6 +49,7 @@ public class SystemController {
 
     @PostMapping("/configs")
     @PreAuthorize("hasAuthority('CONFIG_MANAGE')")
+    @PreventDuplicateSubmit
     public String updateConfig(@RequestParam Long id,
                                @RequestParam String configValue,
                                @RequestParam(required = false) String keyword,
@@ -71,12 +71,8 @@ public class SystemController {
                        @RequestParam(required = false) String module,
                        @RequestParam(required = false) String ip,
                        Model model) {
-        int pageSize = Math.min(Math.max(size, 1), 100);
-        Page<OperationLog> logs = operationLogQueryService.search(
-                keyword,
-                module,
-                ip,
-                PageRequest.of(Math.max(page, 0), pageSize, Sort.by(Sort.Direction.DESC, "createTime")));
+        int pageSize = operationLogQueryService.normalizePageSize(size);
+        Page<OperationLog> logs = operationLogQueryService.search(keyword, module, ip, page, pageSize);
         model.addAttribute("logs", logs);
         model.addAttribute("keyword", keyword);
         model.addAttribute("module", module);
@@ -94,9 +90,34 @@ public class SystemController {
         return csvResponse("operation-logs.csv", operationLogQueryService.exportCsv(keyword, module, ip));
     }
 
+    @PostMapping("/logs/cleanup")
+    @PreAuthorize("hasAuthority('LOG_VIEW')")
+    @PreventDuplicateSubmit
+    public String cleanupLogs(@RequestParam(defaultValue = "180") int retentionDays,
+                              @RequestParam(required = false) String keyword,
+                              @RequestParam(required = false) String module,
+                              @RequestParam(required = false) String ip,
+                              RedirectAttributes redirectAttributes) {
+        try {
+            int removed = operationLogQueryService.cleanupOlderThan(retentionDays);
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.system.logsCleaned", removed));
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
+        }
+        return redirectToLogs(keyword, module, ip);
+    }
+
     private String redirectToConfigs(String keyword) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/system/configs");
         queryParam(builder, "keyword", keyword);
+        return "redirect:" + builder.build().encode().toUriString();
+    }
+
+    private String redirectToLogs(String keyword, String module, String ip) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/system/logs");
+        queryParam(builder, "keyword", keyword);
+        queryParam(builder, "module", module);
+        queryParam(builder, "ip", ip);
         return "redirect:" + builder.build().encode().toUriString();
     }
 

@@ -3,20 +3,17 @@ package com.codezeng.lms.web;
 import com.codezeng.lms.domain.User;
 import com.codezeng.lms.domain.enums.AccountStatus;
 import com.codezeng.lms.domain.enums.UserRole;
-import com.codezeng.lms.repository.UserRepository;
 import com.codezeng.lms.security.Permission;
+import com.codezeng.lms.security.PreventDuplicateSubmit;
 import com.codezeng.lms.service.I18nMessageService;
-import com.codezeng.lms.service.OperationLogService;
+import com.codezeng.lms.service.UserService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,25 +23,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/users")
 public class UserController {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final OperationLogService operationLogService;
+    private final UserService userService;
     private final I18nMessageService i18n;
 
-    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder, OperationLogService operationLogService, I18nMessageService i18n) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.operationLogService = operationLogService;
+    public UserController(UserService userService, I18nMessageService i18n) {
+        this.userService = userService;
         this.i18n = i18n;
     }
 
@@ -57,8 +46,7 @@ public class UserController {
                        @RequestParam(required = false) AccountStatus status,
                        Model model) {
         int pageSize = Math.min(Math.max(size, 1), 100);
-        model.addAttribute("users", userRepository.findAll(
-                userSpec(keyword, role, status),
+        model.addAttribute("users", userService.search(keyword, role, status,
                 PageRequest.of(Math.max(page, 0), pageSize, Sort.by(Sort.Direction.DESC, "createTime"))));
         model.addAttribute("keyword", keyword);
         model.addAttribute("role", role);
@@ -68,6 +56,18 @@ public class UserController {
         model.addAttribute("pageSize", pageSize);
         model.addAttribute("queryString", queryString(keyword, role, status, pageSize));
         return "user/list";
+    }
+
+    @GetMapping("/trash")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
+    public String trash(@RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "20") int size,
+                        Model model) {
+        int pageSize = Math.min(Math.max(size, 1), 100);
+        model.addAttribute("users", userService.trash(PageRequest.of(
+                Math.max(page, 0), pageSize, Sort.by(Sort.Direction.DESC, "updateTime"))));
+        model.addAttribute("pageSize", pageSize);
+        return "user/trash";
     }
 
     @GetMapping("/new")
@@ -80,98 +80,84 @@ public class UserController {
     @GetMapping("/{id}/edit")
     @PreAuthorize("hasAuthority('USER_MANAGE')")
     public String edit(@PathVariable Long id, Model model) {
-        addFormData(model, userRepository.findById(id).orElseThrow());
+        addFormData(model, userService.getEditable(id));
         return "user/form";
     }
 
     @PostMapping
     @PreAuthorize("hasAuthority('USER_MANAGE')")
+    @PreventDuplicateSubmit
     public String save(@ModelAttribute User user,
                        @RequestParam(required = false) String rawPassword,
                        @RequestParam(required = false) List<String> permissionCodes,
+                       Model model,
                        RedirectAttributes redirectAttributes) {
-        User existing = null;
-        if (hasDuplicateUsername(user) || hasDuplicateEmail(user)) {
-            redirectAttributes.addFlashAttribute("error", i18n.get("error.user.duplicate"));
-            return "redirect:" + (user.getId() == null ? "/users/new" : "/users/" + user.getId() + "/edit");
+        try {
+            userService.save(user, rawPassword, permissionCodes, currentUsername());
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.saved"));
+            return "redirect:/users";
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            addFormData(model, user);
+            model.addAttribute("error", ex.getMessage());
+            return "user/form";
         }
-        if (user.getId() != null) {
-            existing = userRepository.findById(user.getId()).orElseThrow();
-            user.setCreateTime(existing.getCreateTime());
-            user.setDeleted(existing.isDeleted());
-            if (isCurrentUser(existing) && (user.getRole() != existing.getRole() || user.getStatus() != AccountStatus.NORMAL)) {
-                redirectAttributes.addFlashAttribute("error", i18n.get("error.user.selfOperation"));
-                return "redirect:/users";
-            }
-            if (isProtectedAdmin(existing) && demotesOrDisablesLastAdmin(existing, user)) {
-                redirectAttributes.addFlashAttribute("error", i18n.get("error.user.lastAdmin"));
-                return "redirect:/users";
-            }
-        }
-        if (user.getId() != null && !StringUtils.hasText(rawPassword)) {
-            user.setPassword(existing.getPassword());
-        } else {
-            if (!StringUtils.hasText(rawPassword) || rawPassword.length() < 8) {
-                redirectAttributes.addFlashAttribute("error", i18n.get("error.user.passwordRequired"));
-                return "redirect:" + (user.getId() == null ? "/users/new" : "/users/" + user.getId() + "/edit");
-            }
-            user.setPassword(passwordEncoder.encode(rawPassword));
-        }
-        user.setPermissionCodes(normalizePermissionCodes(permissionCodes));
-        userRepository.save(user);
-        operationLogService.record("用户管理", "保存用户", user.getUsername());
-        redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.saved"));
-        return "redirect:/users";
     }
 
     @PostMapping("/{id}/disable")
     @PreAuthorize("hasAuthority('USER_MANAGE')")
+    @PreventDuplicateSubmit
     public String disable(@PathVariable Long id, RedirectAttributes redirectAttributes) {
-        User user = userRepository.findById(id).orElseThrow();
-        if (isCurrentUser(user)) {
-            redirectAttributes.addFlashAttribute("error", i18n.get("error.user.selfOperation"));
-            return "redirect:/users";
+        try {
+            userService.disable(id, currentUsername());
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.disabled"));
+        } catch (IllegalStateException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }
-        if (isProtectedAdmin(user)) {
-            redirectAttributes.addFlashAttribute("error", i18n.get("error.user.lastAdmin"));
-            return "redirect:/users";
-        }
-        user.setStatus(AccountStatus.DISABLED);
-        userRepository.save(user);
-        operationLogService.record("User management", "Disable user", user.getUsername());
-        redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.disabled"));
         return "redirect:/users";
     }
 
     @PostMapping("/{id}/enable")
     @PreAuthorize("hasAuthority('USER_MANAGE')")
+    @PreventDuplicateSubmit
     public String enable(@PathVariable Long id, RedirectAttributes redirectAttributes) {
-        User user = userRepository.findById(id).orElseThrow();
-        user.setStatus(AccountStatus.NORMAL);
-        userRepository.save(user);
-        operationLogService.record("User management", "Enable user", user.getUsername());
+        userService.enable(id);
         redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.enabled"));
         return "redirect:/users";
     }
 
     @PostMapping("/{id}/delete")
     @PreAuthorize("hasAuthority('USER_MANAGE')")
+    @PreventDuplicateSubmit
     public String delete(@PathVariable Long id, RedirectAttributes redirectAttributes) {
-        User user = userRepository.findById(id).orElseThrow();
-        if (isCurrentUser(user)) {
-            redirectAttributes.addFlashAttribute("error", i18n.get("error.user.selfOperation"));
-            return "redirect:/users";
+        try {
+            userService.softDelete(id, currentUsername());
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.deleted"));
+        } catch (IllegalStateException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }
-        if (isProtectedAdmin(user)) {
-            redirectAttributes.addFlashAttribute("error", i18n.get("error.user.lastAdmin"));
-            return "redirect:/users";
-        }
-        user.setDeleted(true);
-        user.setStatus(AccountStatus.DISABLED);
-        userRepository.save(user);
-        operationLogService.record("User management", "Delete user", user.getUsername());
-        redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.deleted"));
         return "redirect:/users";
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
+    @PreventDuplicateSubmit
+    public String restore(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            userService.restore(id);
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.restored"));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/users/trash";
+    }
+
+    @PostMapping("/{id}/purge")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
+    @PreventDuplicateSubmit
+    public String purge(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        userService.purge(id);
+        redirectAttributes.addFlashAttribute("message", i18n.get("flash.user.purged"));
+        return "redirect:/users/trash";
     }
 
     private void addFormData(Model model, User user) {
@@ -179,87 +165,12 @@ public class UserController {
         model.addAttribute("roles", UserRole.values());
         model.addAttribute("accountStatuses", AccountStatus.values());
         model.addAttribute("permissions", Permission.values());
-        model.addAttribute("selectedPermissionCodes", selectedPermissionCodes(user));
+        model.addAttribute("selectedPermissionCodes", userService.selectedPermissionCodes(user));
     }
 
-    private String normalizePermissionCodes(List<String> permissionCodes) {
-        if (permissionCodes == null || permissionCodes.isEmpty()) {
-            return "";
-        }
-        Set<String> allowed = Arrays.stream(Permission.values())
-                .map(Permission::name)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        return permissionCodes.stream()
-                .map(String::trim)
-                .filter(allowed::contains)
-                .distinct()
-                .collect(Collectors.joining(","));
-    }
-
-    private Set<String> selectedPermissionCodes(User user) {
-        if (!StringUtils.hasText(user.getPermissionCodes())) {
-            return Set.of();
-        }
-        return Arrays.stream(user.getPermissionCodes().split(","))
-                .map(String::trim)
-                .filter(StringUtils::hasText)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-    }
-
-    private Specification<User> userSpec(String keyword, UserRole role, AccountStatus status) {
-        Specification<User> spec = (root, query, builder) -> builder.isFalse(root.get("deleted"));
-        if (role != null) {
-            spec = spec.and((root, query, builder) -> builder.equal(root.get("role"), role));
-        }
-        if (status != null) {
-            spec = spec.and((root, query, builder) -> builder.equal(root.get("status"), status));
-        }
-        if (StringUtils.hasText(keyword)) {
-            String like = "%" + keyword.trim().toLowerCase() + "%";
-            spec = spec.and((root, query, builder) -> builder.or(
-                    builder.like(builder.lower(root.get("username")), like),
-                    builder.like(builder.lower(root.get("email")), like),
-                    builder.like(builder.lower(root.get("nickname")), like),
-                    builder.like(builder.lower(root.get("phone")), like),
-                    builder.like(builder.lower(root.get("readerNo")), like)));
-        }
-        return spec;
-    }
-
-    private boolean hasDuplicateUsername(User user) {
-        if (!StringUtils.hasText(user.getUsername())) {
-            return false;
-        }
-        return user.getId() == null
-                ? userRepository.existsByUsername(user.getUsername())
-                : userRepository.existsByUsernameAndIdNot(user.getUsername(), user.getId());
-    }
-
-    private boolean hasDuplicateEmail(User user) {
-        if (!StringUtils.hasText(user.getEmail())) {
-            return false;
-        }
-        return user.getId() == null
-                ? userRepository.existsByEmail(user.getEmail())
-                : userRepository.existsByEmailAndIdNot(user.getEmail(), user.getId());
-    }
-
-    private boolean demotesOrDisablesLastAdmin(User existing, User updated) {
-        if (!isProtectedAdmin(existing)) {
-            return false;
-        }
-        return updated.getRole() != UserRole.SUPER_ADMIN || updated.getStatus() != AccountStatus.NORMAL;
-    }
-
-    private boolean isProtectedAdmin(User user) {
-        return user.getRole() == UserRole.SUPER_ADMIN
-                && user.getStatus() == AccountStatus.NORMAL
-                && userRepository.countByRoleAndStatusAndDeletedFalse(UserRole.SUPER_ADMIN, AccountStatus.NORMAL) <= 1;
-    }
-
-    private boolean isCurrentUser(User user) {
+    private String currentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null && user.getUsername().equals(authentication.getName());
+        return authentication == null ? null : authentication.getName();
     }
 
     private String queryString(String keyword, UserRole role, AccountStatus status, int size) {

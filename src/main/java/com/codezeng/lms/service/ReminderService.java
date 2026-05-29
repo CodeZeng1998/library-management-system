@@ -26,6 +26,8 @@ public class ReminderService {
     private final NotificationService notificationService;
     private final OperationLogService operationLogService;
     private final ReservationService reservationService;
+    private final SystemConfigService systemConfigService;
+    private final I18nMessageService i18n;
 
     public ReminderService(
             BorrowService borrowService,
@@ -34,7 +36,9 @@ public class ReminderService {
             ReaderRepository readerRepository,
             NotificationService notificationService,
             OperationLogService operationLogService,
-            ReservationService reservationService) {
+            ReservationService reservationService,
+            SystemConfigService systemConfigService,
+            I18nMessageService i18n) {
         this.borrowService = borrowService;
         this.borrowRecordRepository = borrowRecordRepository;
         this.fineRecordRepository = fineRecordRepository;
@@ -42,62 +46,105 @@ public class ReminderService {
         this.notificationService = notificationService;
         this.operationLogService = operationLogService;
         this.reservationService = reservationService;
+        this.systemConfigService = systemConfigService;
+        this.i18n = i18n;
     }
 
     @Scheduled(cron = "0 0 8 * * ?")
     @Transactional
     public void sendDueReminders() {
-        LocalDate targetDate = LocalDate.now().plusDays(3);
+        runDueReminders();
+    }
+
+    public int runDueReminders() {
+        if (!systemConfigService.maintenanceEnabled()) {
+            return 0;
+        }
+        int reminderDays = systemConfigService.dueReminderDays();
+        LocalDate targetDate = LocalDate.now().plusDays(reminderDays);
         List<BorrowRecord> records = borrowRecordRepository.findByStatusAndDueDate(BorrowStatus.BORROWED, targetDate);
+        int sent = 0;
         for (BorrowRecord record : records) {
-            notificationService.send(
+            if (notificationService.sendOnce(
                     record.getReader(),
-                    "图书即将到期",
-                    "您借阅的《" + record.getBook().getTitle() + "》将在3天后到期，请及时归还或办理续借。");
+                    i18n.get("notification.borrow.due.title"),
+                    i18n.get("notification.borrow.due.content", record.getBook().getTitle(), reminderDays, record.getDueDate()))) {
+                sent++;
+            }
         }
-        if (!records.isEmpty()) {
-            operationLogService.record("消息中心", "发送到期提醒", records.size() + " 条");
+        if (sent > 0) {
+            operationLogService.record(i18n.get("log.module.notification"), i18n.get("log.maintenance.dueReminders"),
+                    i18n.get("log.maintenance.sentCount", sent));
         }
+        return sent;
     }
 
     @Scheduled(cron = "0 0 9 * * ?")
     @Transactional
     public void sendOverdueNotices() {
+        runOverdueMaintenance();
+    }
+
+    public OverdueMaintenanceResult runOverdueMaintenance() {
+        if (!systemConfigService.maintenanceEnabled()) {
+            return new OverdueMaintenanceResult(0, 0, 0);
+        }
         borrowService.markOverdueRecords();
         List<BorrowRecord> records = borrowRecordRepository.findByStatus(BorrowStatus.OVERDUE);
+        int sent = 0;
+        int finesCreated = 0;
+        int readersFrozen = 0;
+        int freezeDays = systemConfigService.overdueFreezeDays();
         for (BorrowRecord record : records) {
             long overdueDays = ChronoUnit.DAYS.between(record.getDueDate(), LocalDate.now());
-            notificationService.send(
+            if (notificationService.sendOnce(
                     record.getReader(),
-                    "图书逾期提醒",
-                    "您借阅的《" + record.getBook().getTitle() + "》已逾期" + overdueDays
-                            + "天，当前罚款：" + record.getFineAmount() + "元，请尽快归还。");
+                    i18n.get("notification.borrow.overdue.title"),
+                    i18n.get("notification.borrow.overdue.content", record.getBook().getTitle(), overdueDays, record.getFineAmount()))) {
+                sent++;
+            }
             if (!fineRecordRepository.existsByBorrowRecordAndStatus(record, FineStatus.UNPAID)
                     && record.getFineAmount().signum() > 0) {
                 FineRecord fine = new FineRecord();
                 fine.setReader(record.getReader());
                 fine.setBorrowRecord(record);
-                fine.setReason("逾期未还");
+                fine.setReason(i18n.get("fine.reason.overdue"));
                 fine.setAmount(record.getFineAmount());
                 fine.setStatus(FineStatus.UNPAID);
                 fineRecordRepository.save(fine);
+                finesCreated++;
             }
-            if (overdueDays > 7 && record.getReader().getStatus() == AccountStatus.NORMAL) {
+            if (overdueDays > freezeDays && record.getReader().getStatus() == AccountStatus.NORMAL) {
                 record.getReader().setStatus(AccountStatus.FROZEN);
                 readerRepository.save(record.getReader());
+                readersFrozen++;
             }
         }
-        if (!records.isEmpty()) {
-            operationLogService.record("消息中心", "发送逾期提醒", records.size() + " 条");
+        if (sent > 0 || finesCreated > 0 || readersFrozen > 0) {
+            operationLogService.record(i18n.get("log.module.notification"), i18n.get("log.maintenance.overdueMaintenance"),
+                    i18n.get("log.maintenance.overdueDetail", sent, finesCreated, readersFrozen));
         }
+        return new OverdueMaintenanceResult(sent, finesCreated, readersFrozen);
     }
 
     @Scheduled(cron = "0 30 9 * * ?")
     @Transactional
     public void releaseExpiredReservations() {
+        runReservationMaintenance();
+    }
+
+    public int runReservationMaintenance() {
+        if (!systemConfigService.maintenanceEnabled()) {
+            return 0;
+        }
         int releasedCopies = reservationService.expireReservations();
         if (releasedCopies > 0) {
-            operationLogService.record("预约管理", "释放过期到书保留", releasedCopies + " 本");
+            operationLogService.record(i18n.get("log.module.reservation"), i18n.get("log.maintenance.releaseReservations"),
+                    i18n.get("log.maintenance.releasedCopies", releasedCopies));
         }
+        return releasedCopies;
+    }
+
+    public record OverdueMaintenanceResult(int notificationsSent, int finesCreated, int readersFrozen) {
     }
 }

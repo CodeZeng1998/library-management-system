@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|#{user.trash} - #{app.name}|">User Trash</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <div th:replace="~{fragments/nav :: sidebar}"></div>
+    <main class="content">
+        <div class="topbar">
+            <h1 class="page-title" th:text="#{user.trash}">User Trash</h1>
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-primary" th:href="@{/users}" th:text="#{common.back}">Back</a>
+            </div>
+        </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
+        <section class="panel">
+            <div class="table-toolbar">
+                <div>
+                    <h2 class="section-title" th:text="#{user.trashCount(${users.totalElements})}">Deleted users</h2>
+                    <span class="hint" th:text="#{user.trashHint}">Restore accounts deleted by mistake.</span>
+                </div>
+            </div>
+            <table class="layui-table responsive-table">
+                <thead>
+                <tr>
+                    <th th:text="#{user.username}">Username</th>
+                    <th th:text="#{user.email}">Email</th>
+                    <th th:text="#{user.nickname}">Nickname</th>
+                    <th th:text="#{user.role}">Role</th>
+                    <th th:text="#{user.status}">Status</th>
+                    <th th:text="#{common.time}">Time</th>
+                    <th th:text="#{common.operation}">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="user : ${users.content}">
+                    <td th:text="${user.username}">username</td>
+                    <td th:text="${user.email}">email</td>
+                    <td th:text="${user.nickname}">nickname</td>
+                    <td th:text="${#messages.msg('role.' + user.role.name())}">role</td>
+                    <td><span class="status-chip" th:classappend="${' status-' + user.status.name().toLowerCase()}" th:text="${#messages.msg('status.' + user.status.name())}"></span></td>
+                    <td th:text="${#temporals.format(user.updateTime, 'yyyy-MM-dd HH:mm')}">Time</td>
+                    <td class="table-actions">
+                        <form th:action="@{/users/{id}/restore(id=${user.id})}" method="post" th:attr="onsubmit=|return confirm('#{user.confirmRestore}')|">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs" type="submit" th:text="#{common.restore}">Restore</button>
+                        </form>
+                        <form th:action="@{/users/{id}/purge(id=${user.id})}" method="post" th:attr="onsubmit=|return confirm('#{user.confirmPurge}')|">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs layui-btn-danger" type="submit" th:text="#{common.purge}">Delete permanently</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div class="empty-result" th:if="${users.totalElements == 0}" th:text="#{user.trashEmpty}">No deleted users.</div>
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${users.hasPrevious()}" th:href="@{/users/trash(page=${users.number - 1}, size=${pageSize})}" th:text="#{common.previous}">Previous</a>
+                <span th:text="|${users.number + 1} / ${users.totalPages == 0 ? 1 : users.totalPages}|"></span>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${users.hasNext()}" th:href="@{/users/trash(page=${users.number + 1}, size=${pageSize})}" th:text="#{common.next}">Next</a>
+            </div>
+        </section>
+    </main>
+</div>
+</body>
+</html>

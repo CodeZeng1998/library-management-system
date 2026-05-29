@@ -7,23 +7,30 @@ import com.codezeng.lms.domain.Reader;
 import com.codezeng.lms.domain.enums.AccountStatus;
 import com.codezeng.lms.domain.enums.BorrowStatus;
 import com.codezeng.lms.domain.enums.FineStatus;
+import com.codezeng.lms.domain.enums.MemberLevel;
 import com.codezeng.lms.repository.BookRepository;
 import com.codezeng.lms.repository.BorrowRecordRepository;
 import com.codezeng.lms.repository.FineRecordRepository;
 import com.codezeng.lms.repository.ReaderRepository;
 import com.codezeng.lms.security.DataScopeService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
 public class BorrowService {
 
-    private static final BigDecimal OVERDUE_FINE_PER_DAY = new BigDecimal("0.10");
+    private static final DateTimeFormatter EXPORT_DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final BookRepository bookRepository;
     private final ReaderRepository readerRepository;
@@ -33,6 +40,7 @@ public class BorrowService {
     private final ReservationService reservationService;
     private final DataScopeService dataScopeService;
     private final I18nMessageService i18n;
+    private final SystemConfigService systemConfigService;
 
     public BorrowService(
             BookRepository bookRepository,
@@ -42,7 +50,8 @@ public class BorrowService {
             OperationLogService operationLogService,
             ReservationService reservationService,
             DataScopeService dataScopeService,
-            I18nMessageService i18n) {
+            I18nMessageService i18n,
+            SystemConfigService systemConfigService) {
         this.bookRepository = bookRepository;
         this.readerRepository = readerRepository;
         this.borrowRecordRepository = borrowRecordRepository;
@@ -51,13 +60,46 @@ public class BorrowService {
         this.reservationService = reservationService;
         this.dataScopeService = dataScopeService;
         this.i18n = i18n;
+        this.systemConfigService = systemConfigService;
+    }
+
+    public Page<BorrowRecord> search(BorrowStatus status, String keyword, int page, int size) {
+        int pageSize = normalizePageSize(size);
+        return borrowRecordRepository.findAll(
+                borrowSpec(status, keyword),
+                PageRequest.of(Math.max(page, 0), pageSize, Sort.by(Sort.Direction.DESC, "createTime")));
+    }
+
+    public String exportCsv(BorrowStatus status, String keyword) {
+        List<BorrowRecord> records = borrowRecordRepository.findAll(
+                borrowSpec(status, keyword),
+                PageRequest.of(0, systemConfigService.exportMaxRows(), Sort.by(Sort.Direction.DESC, "createTime"))).getContent();
+        StringBuilder csv = new StringBuilder("\uFEFFBook Title,ISBN,Reader No,Reader Name,Borrow Date,Due Date,Return Date,Status,Fine,Renew Count\n");
+        for (BorrowRecord record : records) {
+            csv.append(CsvSupport.csv(record.getBook().getTitle())).append(',')
+                    .append(CsvSupport.csv(record.getBook().getIsbn())).append(',')
+                    .append(CsvSupport.csv(record.getReader().getReaderNo())).append(',')
+                    .append(CsvSupport.csv(record.getReader().getName())).append(',')
+                    .append(CsvSupport.csv(formatDate(record.getBorrowDate()))).append(',')
+                    .append(CsvSupport.csv(formatDate(record.getDueDate()))).append(',')
+                    .append(CsvSupport.csv(formatDate(record.getReturnDate()))).append(',')
+                    .append(CsvSupport.csv(record.getStatus().name())).append(',')
+                    .append(CsvSupport.csv(String.valueOf(record.getFineAmount()))).append(',')
+                    .append(CsvSupport.csv(String.valueOf(record.getRenewCount()))).append('\n');
+        }
+        operationLogService.record("Borrow management", "Export borrow records", "Rows: " + records.size());
+        return csv.toString();
+    }
+
+    public int normalizePageSize(int size) {
+        return Math.min(Math.max(size, 1), 100);
     }
 
     @Transactional
     public BorrowRecord borrowBook(Long bookId, Long readerId) {
-        Book book = bookRepository.findById(bookId).orElseThrow();
+        Book book = bookRepository.findByIdForUpdate(bookId).orElseThrow();
         dataScopeService.requireAccess(book);
-        Reader reader = readerRepository.findById(readerId).orElseThrow();
+        Reader reader = readerRepository.findByIdAndDeletedFalse(readerId).orElseThrow();
         boolean useLockedReservation = validateBorrow(book, reader);
 
         BorrowRecord record = new BorrowRecord();
@@ -76,15 +118,15 @@ public class BorrowService {
         bookRepository.save(book);
 
         BorrowRecord saved = borrowRecordRepository.save(record);
-        operationLogService.record("借阅管理", "借出图书", book.getTitle() + " -> " + reader.getReaderNo());
+        operationLogService.record("Borrow management", "Borrow book", book.getTitle() + " -> " + reader.getReaderNo());
         return saved;
     }
 
     @Transactional
     public BorrowRecord returnBook(Long recordId, boolean damaged, boolean lost) {
-        BorrowRecord record = borrowRecordRepository.findById(recordId).orElseThrow();
+        BorrowRecord record = borrowRecordRepository.findByIdForUpdate(recordId).orElseThrow();
         dataScopeService.requireAccess(record);
-        if (record.getStatus() == BorrowStatus.RETURNED) {
+        if (isTerminalReturnStatus(record.getStatus())) {
             return record;
         }
 
@@ -108,20 +150,26 @@ public class BorrowService {
             FineRecord fine = new FineRecord();
             fine.setReader(record.getReader());
             fine.setBorrowRecord(record);
-            fine.setReason(lost ? "图书丢失" : damaged ? "图书损坏" : "逾期归还");
+            fine.setReason(lost ? i18n.get("fine.reason.lost") : damaged ? i18n.get("fine.reason.damaged") : i18n.get("fine.reason.overdue"));
             fine.setAmount(fineAmount);
             fine.setStatus(FineStatus.UNPAID);
             fineRecordRepository.save(fine);
         }
 
         BorrowRecord saved = borrowRecordRepository.save(record);
-        operationLogService.record("借阅管理", "归还图书", record.getBook().getTitle());
+        operationLogService.record("Borrow management", "Return book", record.getBook().getTitle());
         return saved;
+    }
+
+    private boolean isTerminalReturnStatus(BorrowStatus status) {
+        return status == BorrowStatus.RETURNED
+                || status == BorrowStatus.LOST
+                || status == BorrowStatus.DAMAGED;
     }
 
     @Transactional
     public BorrowRecord renew(Long recordId) {
-        BorrowRecord record = borrowRecordRepository.findById(recordId).orElseThrow();
+        BorrowRecord record = borrowRecordRepository.findByIdForUpdate(recordId).orElseThrow();
         dataScopeService.requireAccess(record);
         if (record.getStatus() != BorrowStatus.BORROWED) {
             throw new IllegalStateException(i18n.get("error.borrow.onlyBorrowedRenew"));
@@ -136,7 +184,7 @@ public class BorrowService {
         record.setRenewCount(record.getRenewCount() + 1);
         record.setDueDate(record.getDueDate().plusDays(record.getReader().getMemberLevel().getBorrowDays()));
         BorrowRecord saved = borrowRecordRepository.save(record);
-        operationLogService.record("借阅管理", "续借图书", record.getBook().getTitle());
+        operationLogService.record("Borrow management", "Renew book", record.getBook().getTitle());
         return saved;
     }
 
@@ -161,16 +209,19 @@ public class BorrowService {
         if (reader.getStatus() != AccountStatus.NORMAL) {
             throw new IllegalStateException(i18n.get("error.borrow.accountStatus"));
         }
-        long activeBorrows = borrowRecordRepository.countByReaderAndStatusIn(
+        long activeBorrows = borrowRecordRepository.countByReaderAndStatusInAndDeletedFalse(
                 reader, List.of(BorrowStatus.BORROWED, BorrowStatus.OVERDUE));
-        if (activeBorrows >= reader.getMemberLevel().getMaxBorrowBooks()) {
+        if (activeBorrows >= maxBorrowBooks(reader)) {
             throw new IllegalStateException(i18n.get("error.borrow.maxBorrow"));
         }
-        if (borrowRecordRepository.existsByReaderAndStatusAndDueDateBefore(reader, BorrowStatus.BORROWED, LocalDate.now())) {
+        if (borrowRecordRepository.existsByReaderAndStatusAndDueDateBeforeAndDeletedFalse(reader, BorrowStatus.BORROWED, LocalDate.now())) {
             throw new IllegalStateException(i18n.get("error.borrow.overdueBook"));
         }
-        if (fineRecordRepository.existsByReaderAndStatus(reader, FineStatus.UNPAID)) {
+        if (fineRecordRepository.existsByReaderAndStatusAndDeletedFalse(reader, FineStatus.UNPAID)) {
             throw new IllegalStateException(i18n.get("error.borrow.unpaidFine"));
+        }
+        if (borrowRecordRepository.existsByBookAndReaderAndStatusInAndDeletedFalse(book, reader, List.of(BorrowStatus.BORROWED, BorrowStatus.OVERDUE))) {
+            throw new IllegalStateException(i18n.get("error.borrow.duplicateActiveBook"));
         }
         boolean hasLockedReservation = reservationService.hasActiveNotifiedReservation(book, reader);
         if (book.getAvailableQuantity() <= 0 && !hasLockedReservation) {
@@ -179,12 +230,30 @@ public class BorrowService {
         return hasLockedReservation;
     }
 
+    public int maxBorrowBooks(Reader reader) {
+        if (reader.getMemberLevel() == MemberLevel.NORMAL) {
+            return systemConfigService.normalBorrowLimit();
+        }
+        return reader.getMemberLevel().getMaxBorrowBooks();
+    }
+
+    public BigDecimal estimateFine(BorrowRecord record, boolean damaged, boolean lost) {
+        BigDecimal fine = calculateOverdueFine(record);
+        if (lost) {
+            return fine.add(compensation(record.getBook(), new BigDecimal("2.00")));
+        }
+        if (damaged) {
+            return fine.add(compensation(record.getBook(), new BigDecimal("0.50")));
+        }
+        return fine;
+    }
+
     private BigDecimal calculateOverdueFine(BorrowRecord record) {
         long overdueDays = ChronoUnit.DAYS.between(record.getDueDate(), LocalDate.now());
         if (overdueDays <= 0) {
             return BigDecimal.ZERO;
         }
-        return OVERDUE_FINE_PER_DAY.multiply(BigDecimal.valueOf(overdueDays));
+        return systemConfigService.dailyOverdueFine().multiply(BigDecimal.valueOf(overdueDays));
     }
 
     private BigDecimal compensation(Book book, BigDecimal multiplier) {
@@ -192,5 +261,25 @@ public class BorrowService {
             return BigDecimal.ZERO;
         }
         return book.getPrice().multiply(multiplier);
+    }
+
+    private Specification<BorrowRecord> borrowSpec(BorrowStatus status, String keyword) {
+        Specification<BorrowRecord> spec = dataScopeService.borrowRecordScope();
+        if (status != null) {
+            spec = spec.and((root, query, builder) -> builder.equal(root.get("status"), status));
+        }
+        if (StringUtils.hasText(keyword)) {
+            String like = "%" + keyword.trim().toLowerCase() + "%";
+            spec = spec.and((root, query, builder) -> builder.or(
+                    builder.like(builder.lower(root.join("book").get("title")), like),
+                    builder.like(builder.lower(root.join("book").get("isbn")), like),
+                    builder.like(builder.lower(root.join("reader").get("readerNo")), like),
+                    builder.like(builder.lower(root.join("reader").get("name")), like)));
+        }
+        return spec;
+    }
+
+    private String formatDate(LocalDate date) {
+        return date == null ? "" : EXPORT_DATE_FORMAT.format(date);
     }
 }

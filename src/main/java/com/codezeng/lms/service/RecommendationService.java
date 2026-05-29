@@ -8,6 +8,7 @@ import com.codezeng.lms.repository.BookRepository;
 import com.codezeng.lms.repository.BorrowRecordRepository;
 import com.codezeng.lms.repository.ReaderRepository;
 import com.codezeng.lms.security.DataScopeService;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
@@ -44,12 +45,12 @@ public class RecommendationService {
     }
 
     public RecommendationDashboard dashboard(Long readerId, Long bookId) {
-        List<Book> books = bookRepository.findAll(dataScopeService.bookScope(), Sort.by("title"));
+        List<Book> books = visibleBooks();
         List<BorrowRecord> records = borrowRecordRepository.findAll(dataScopeService.borrowRecordScope());
-        Optional<Reader> selectedReader = readerId == null ? Optional.empty() : readerRepository.findById(readerId);
+        Optional<Reader> selectedReader = readerId == null ? Optional.empty() : readerRepository.findByIdAndDeletedFalse(readerId);
         Optional<Book> selectedBook = bookId == null
                 ? defaultSelectedBook(books, records)
-                : bookRepository.findById(bookId).filter(dataScopeService::canAccess);
+                : bookRepository.findByIdAndDeletedFalse(bookId).filter(dataScopeService::canAccess);
 
         return new RecommendationDashboard(
                 selectedReader.orElse(null),
@@ -61,6 +62,35 @@ public class RecommendationService {
                 hotRanking(records, 30),
                 hotRanking(records, 365),
                 subjectLists(books));
+    }
+
+    public List<Reader> selectableReaders() {
+        return readerRepository.findByDeletedFalse(PageRequest.of(0, 200, Sort.by("readerNo"))).getContent();
+    }
+
+    public List<Book> visibleBooks() {
+        return bookRepository.findAll(dataScopeService.bookScope(), Sort.by("title"));
+    }
+
+    public String exportCsv(Long readerId, Long bookId) {
+        RecommendationDashboard dashboard = dashboard(readerId, bookId);
+        StringBuilder csv = new StringBuilder("\uFEFFSection,Book Title,ISBN,Score,Reason\n");
+        appendRecommendations(csv, "For reader", dashboard.collaborative());
+        appendRecommendations(csv, "Also borrowed", dashboard.borrowedTogether());
+        appendRecommendations(csv, "New preferred", dashboard.newArrivals());
+        for (RankingBook item : dashboard.weeklyHot()) {
+            appendRow(csv, "Weekly hot", item.book(), item.borrowCount(), "recommendation.reason.popular");
+        }
+        for (RankingBook item : dashboard.monthlyHot()) {
+            appendRow(csv, "Monthly hot", item.book(), item.borrowCount(), "recommendation.reason.popular");
+        }
+        for (RankingBook item : dashboard.yearlyHot()) {
+            appendRow(csv, "Yearly hot", item.book(), item.borrowCount(), "recommendation.reason.popular");
+        }
+        for (SubjectBookList subjectList : dashboard.subjectLists()) {
+            appendRecommendations(csv, "Subject: " + subjectList.subject(), subjectList.books());
+        }
+        return csv.toString();
     }
 
     private List<BookRecommendation> collaborativeRecommendations(Reader reader, List<Book> books, List<BorrowRecord> records) {
@@ -247,6 +277,20 @@ public class RecommendationService {
 
     private static LocalDateTime createdAtSafe(Book book) {
         return book.getCreateTime() == null ? LocalDateTime.MIN : book.getCreateTime();
+    }
+
+    private void appendRecommendations(StringBuilder csv, String section, List<BookRecommendation> recommendations) {
+        for (BookRecommendation item : recommendations) {
+            appendRow(csv, section, item.book(), item.score(), item.reason());
+        }
+    }
+
+    private void appendRow(StringBuilder csv, String section, Book book, long score, String reason) {
+        csv.append(CsvSupport.csv(section)).append(',')
+                .append(CsvSupport.csv(book.getTitle())).append(',')
+                .append(CsvSupport.csv(book.getIsbn())).append(',')
+                .append(CsvSupport.csv(String.valueOf(score))).append(',')
+                .append(CsvSupport.csv(reason)).append('\n');
     }
 
     public record RecommendationDashboard(

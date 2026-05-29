@@ -32,6 +32,7 @@ import com.codezeng.lms.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
@@ -53,27 +54,54 @@ public class DataInitializer {
                                FineRecordRepository fineRecordRepository,
                                LocalizedTextRepository localizedTextRepository,
                                SystemConfigRepository systemConfigRepository,
-                               PasswordEncoder passwordEncoder) {
+                               PasswordEncoder passwordEncoder,
+                               Environment environment) {
         return args -> {
-            seedUsers(userRepository, passwordEncoder);
-            bindUserToReader(userRepository, "reader_demo", "R202605230001");
-            seedBooks(categoryRepository, bookRepository, localizedTextRepository);
-            seedReaders(readerRepository);
-            seedBorrowRecords(bookRepository, readerRepository, borrowRecordRepository);
-            seedReservations(bookRepository, readerRepository, reservationRecordRepository);
-            seedNotifications(readerRepository, notificationRepository);
-            seedFines(readerRepository, borrowRecordRepository, fineRecordRepository);
+            if (isBootstrapAdminEnabled(environment)) {
+                seedBootstrapAdmin(userRepository, passwordEncoder, environment);
+            }
+            if (isDemoSeedEnabled(environment)) {
+                seedUsers(userRepository, passwordEncoder, environment);
+                bindUserToReader(userRepository, "reader_demo", "R202605230001");
+                seedBooks(categoryRepository, bookRepository, localizedTextRepository);
+                seedReaders(readerRepository);
+                seedBorrowRecords(bookRepository, readerRepository, borrowRecordRepository);
+                seedReservations(bookRepository, readerRepository, reservationRecordRepository);
+                seedNotifications(readerRepository, notificationRepository);
+                seedFines(readerRepository, borrowRecordRepository, fineRecordRepository);
+            }
             seedConfigs(systemConfigRepository);
         };
     }
 
-    private void seedUsers(UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        createUser(userRepository, passwordEncoder, "admin", "admin@example.com", "系统管理员", "13800000001", UserRole.SUPER_ADMIN, AccountStatus.NORMAL, "admin123");
-        createUser(userRepository, passwordEncoder, "librarian", "librarian@example.com", "图书管理员", "13800000002", UserRole.LIBRARIAN, AccountStatus.NORMAL, "librarian123");
-        createUser(userRepository, passwordEncoder, "assistant1", "assistant1@example.com", "流通台一号", "13800000003", UserRole.LIBRARIAN, AccountStatus.NORMAL, "assistant123");
-        createUser(userRepository, passwordEncoder, "librarian2", "librarian2@example.com", "少儿馆馆员", "13800000004", UserRole.LIBRARIAN, AccountStatus.NORMAL, "librarian123");
-        createUser(userRepository, passwordEncoder, "reader_demo", "reader.demo@example.com", "读者体验账号", "13800000005", UserRole.READER, AccountStatus.NORMAL, "reader123");
-        createUser(userRepository, passwordEncoder, "disabled_user", "disabled@example.com", "停用账号样例", "13800000006", UserRole.READER, AccountStatus.DISABLED, "disabled123");
+    private void seedBootstrapAdmin(UserRepository userRepository, PasswordEncoder passwordEncoder, Environment environment) {
+        String username = environment.getProperty("LMS_BOOTSTRAP_ADMIN_USERNAME", "admin");
+        String email = environment.getProperty("LMS_BOOTSTRAP_ADMIN_EMAIL", "admin@example.com");
+        String password = environment.getProperty("LMS_BOOTSTRAP_ADMIN_PASSWORD");
+        if (password == null || password.isBlank()) {
+            throw new IllegalStateException("LMS_BOOTSTRAP_ADMIN_PASSWORD must be configured when bootstrap admin seeding is enabled.");
+        }
+        createUser(userRepository, passwordEncoder, username, email, "系统管理员", "13800000001", UserRole.SUPER_ADMIN, AccountStatus.NORMAL, password);
+    }
+
+    private void seedUsers(UserRepository userRepository, PasswordEncoder passwordEncoder, Environment environment) {
+        String demoPassword = environment.getProperty("LMS_DEMO_PASSWORD");
+        if (demoPassword == null || demoPassword.isBlank()) {
+            throw new IllegalStateException("LMS_DEMO_PASSWORD must be configured when demo seed data is enabled.");
+        }
+        createUser(userRepository, passwordEncoder, "librarian", "librarian@example.com", "图书管理员", "13800000002", UserRole.LIBRARIAN, AccountStatus.NORMAL, demoPassword);
+        createUser(userRepository, passwordEncoder, "assistant1", "assistant1@example.com", "流通台一号", "13800000003", UserRole.LIBRARIAN, AccountStatus.NORMAL, demoPassword);
+        createUser(userRepository, passwordEncoder, "librarian2", "librarian2@example.com", "少儿馆馆员", "13800000004", UserRole.LIBRARIAN, AccountStatus.NORMAL, demoPassword);
+        createUser(userRepository, passwordEncoder, "reader_demo", "reader.demo@example.com", "读者体验账号", "13800000005", UserRole.READER, AccountStatus.NORMAL, demoPassword);
+        createUser(userRepository, passwordEncoder, "disabled_user", "disabled@example.com", "停用账号样例", "13800000006", UserRole.READER, AccountStatus.DISABLED, demoPassword);
+    }
+
+    private boolean isDemoSeedEnabled(Environment environment) {
+        return environment.getProperty("app.seed.demo-enabled", Boolean.class, false);
+    }
+
+    private boolean isBootstrapAdminEnabled(Environment environment) {
+        return environment.getProperty("app.seed.bootstrap-admin-enabled", Boolean.class, true);
     }
 
     private void seedBooks(BookCategoryRepository categoryRepository,
@@ -181,6 +209,12 @@ public class DataInitializer {
         createConfig(systemConfigRepository, "borrow.normal.max_books", "3", "普通会员借阅上限", "普通会员最多可借图书数量");
         createConfig(systemConfigRepository, "fine.overdue.per_day", "0.10", "逾期日罚款", "每本书每天逾期罚款金额");
         createConfig(systemConfigRepository, "reservation.max_queue", "5", "单书预约人数上限", "每本书最多预约人数");
+        createConfig(systemConfigRepository, "reservation.waiting_hold_days", "3", "预约等待保留天数", "读者提交预约后排队资格的默认保留天数");
+        createConfig(systemConfigRepository, "reservation.pickup_window_hours", "48", "预约到馆取书时限", "预约图书可取后为读者锁定馆藏的小时数");
+        createConfig(systemConfigRepository, "maintenance.enabled", "true", "自动维护任务开关", "是否启用到期提醒、逾期处理和预约释放等后台任务");
+        createConfig(systemConfigRepository, "maintenance.due_reminder_days", "3", "到期提前提醒天数", "借阅到期前多少天发送归还提醒");
+        createConfig(systemConfigRepository, "maintenance.overdue_freeze_days", "7", "逾期冻结阈值", "逾期超过多少天自动冻结读者账户");
+        createConfig(systemConfigRepository, "export.max_rows", "5000", "CSV export row limit", "Maximum rows returned by one CSV export request");
     }
 
     private void createConfig(SystemConfigRepository repository, String key, String value, String displayName, String description) {

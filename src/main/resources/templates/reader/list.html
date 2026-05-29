@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="|#{reader.list.title} - #{app.name}|">读者管理 - 图书管理系统</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -14,6 +15,7 @@
         <div class="topbar">
             <h1 class="page-title" th:text="#{reader.list.title}">读者管理</h1>
             <div class="table-actions">
+                <a class="layui-btn layui-btn-primary" th:href="@{/readers/trash}" sec:authorize="hasAuthority('READER_DELETE')" th:text="#{reader.trash}">Trash</a>
                 <a class="layui-btn layui-btn-primary" th:href="@{/readers/export}" sec:authorize="hasAuthority('READER_VIEW')" th:text="#{common.exportCsv}">导出CSV</a>
                 <a class="layui-btn" th:href="@{/readers/new}" sec:authorize="hasAuthority('READER_EDIT')" th:text="#{reader.add}">新增读者</a>
             </div>

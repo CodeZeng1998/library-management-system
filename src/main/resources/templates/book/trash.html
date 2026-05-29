@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|#{book.trash} - #{app.name}|">Book Trash</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <div th:replace="~{fragments/nav :: sidebar}"></div>
+    <main class="content">
+        <div class="topbar">
+            <h1 class="page-title" th:text="#{book.trash}">Book Trash</h1>
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-primary" th:href="@{/books}" th:text="#{common.back}">Back</a>
+            </div>
+        </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
+        <section class="panel">
+            <div class="table-toolbar">
+                <h2 class="section-title" th:text="#{book.trashCount(${books.totalElements})}">Deleted books</h2>
+                <span class="hint" th:text="#{book.trashHint}">Restore records deleted by mistake.</span>
+            </div>
+            <table class="layui-table responsive-table">
+                <thead><tr><th th:text="#{book.title}">Title</th><th th:text="#{book.isbn}">ISBN</th><th th:text="#{book.author}">Author</th><th th:text="#{book.location}">Location</th><th th:text="#{common.time}">Time</th><th th:text="#{common.operation}">Actions</th></tr></thead>
+                <tbody>
+                <tr th:each="book : ${books.content}">
+                    <td th:text="${book.title}">Title</td>
+                    <td th:text="${book.isbn}">ISBN</td>
+                    <td th:text="${book.author}">Author</td>
+                    <td th:text="${book.location ?: '-'}">Location</td>
+                    <td th:text="${#temporals.format(book.updateTime, 'yyyy-MM-dd HH:mm')}">Time</td>
+                    <td class="table-actions">
+                        <form class="inline-form" th:action="@{/books/{id}/restore(id=${book.id})}" method="post" th:attr="onsubmit=|return confirm('#{book.confirmRestore}')|">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs" type="submit" th:text="#{common.restore}">Restore</button>
+                        </form>
+                        <form class="inline-form" th:action="@{/books/{id}/purge(id=${book.id})}" method="post" th:attr="onsubmit=|return confirm('#{book.confirmPurge}')|">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button class="layui-btn layui-btn-xs layui-btn-danger" type="submit" th:text="#{common.purge}">Delete permanently</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div class="empty-result" th:if="${books.totalElements == 0}" th:text="#{book.trashEmpty}">No deleted books.</div>
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${books.hasPrevious()}" th:href="@{/books/trash(page=${books.number - 1}, size=${pageSize})}" th:text="#{common.previous}">Previous</a>
+                <span th:text="|${books.number + 1} / ${books.totalPages == 0 ? 1 : books.totalPages}|"></span>
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:if="${books.hasNext()}" th:href="@{/books/trash(page=${books.number + 1}, size=${pageSize})}" th:text="#{common.next}">Next</a>
+            </div>
+        </section>
+    </main>
+</div>
+</body>
+</html>

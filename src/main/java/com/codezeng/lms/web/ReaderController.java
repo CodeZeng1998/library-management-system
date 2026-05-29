@@ -4,7 +4,7 @@ import com.codezeng.lms.domain.Reader;
 import com.codezeng.lms.domain.enums.AccountStatus;
 import com.codezeng.lms.domain.enums.MemberLevel;
 import com.codezeng.lms.domain.enums.ReaderType;
-import com.codezeng.lms.repository.ReaderRepository;
+import com.codezeng.lms.security.PreventDuplicateSubmit;
 import com.codezeng.lms.service.CsvImportGuard;
 import com.codezeng.lms.service.I18nMessageService;
 import com.codezeng.lms.service.ImportResult;
@@ -37,16 +37,13 @@ public class ReaderController {
     private static final String READER_IMPORT_BYTES = "READER_IMPORT_BYTES";
     private static final String READER_IMPORT_ERRORS = "READER_IMPORT_ERRORS";
 
-    private final ReaderRepository readerRepository;
     private final ReaderService readerService;
     private final CsvImportGuard csvImportGuard;
     private final I18nMessageService i18n;
 
-    public ReaderController(ReaderRepository readerRepository,
-                            ReaderService readerService,
+    public ReaderController(ReaderService readerService,
                             CsvImportGuard csvImportGuard,
                             I18nMessageService i18n) {
-        this.readerRepository = readerRepository;
         this.readerService = readerService;
         this.csvImportGuard = csvImportGuard;
         this.i18n = i18n;
@@ -75,20 +72,28 @@ public class ReaderController {
     @GetMapping("/{id}/edit")
     @PreAuthorize("hasAuthority('READER_EDIT')")
     public String edit(@PathVariable Long id, Model model) {
-        addFormData(model, readerRepository.findById(id).orElseThrow());
+        addFormData(model, readerService.getEditable(id));
         return "reader/form";
     }
 
     @PostMapping
     @PreAuthorize("hasAuthority('READER_EDIT')")
-    public String save(@ModelAttribute Reader reader, RedirectAttributes redirectAttributes) {
-        readerService.save(reader);
-        redirectAttributes.addFlashAttribute("message", i18n.get("flash.reader.saved"));
-        return "redirect:/readers";
+    @PreventDuplicateSubmit
+    public String save(@ModelAttribute Reader reader, Model model, RedirectAttributes redirectAttributes) {
+        try {
+            readerService.save(reader);
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.reader.saved"));
+            return "redirect:/readers";
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            addFormData(model, reader);
+            model.addAttribute("error", ex.getMessage());
+            return "reader/form";
+        }
     }
 
     @PostMapping("/{id}/delete")
     @PreAuthorize("hasAuthority('READER_DELETE')")
+    @PreventDuplicateSubmit
     public String delete(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         readerService.softDelete(id);
         redirectAttributes.addFlashAttribute("message", i18n.get("flash.reader.deleted"));
@@ -97,6 +102,7 @@ public class ReaderController {
 
     @PostMapping("/import")
     @PreAuthorize("hasAuthority('READER_EDIT')")
+    @PreventDuplicateSubmit
     public String importCsv(@RequestParam MultipartFile file,
                             HttpSession session,
                             RedirectAttributes redirectAttributes) {
@@ -115,6 +121,7 @@ public class ReaderController {
 
     @PostMapping("/import/preview")
     @PreAuthorize("hasAuthority('READER_EDIT')")
+    @PreventDuplicateSubmit
     public String previewImport(@RequestParam MultipartFile file,
                                 HttpSession session,
                                 Model model,
@@ -142,6 +149,7 @@ public class ReaderController {
 
     @PostMapping("/import/confirm")
     @PreAuthorize("hasAuthority('READER_EDIT')")
+    @PreventDuplicateSubmit
     public String confirmImport(HttpSession session, RedirectAttributes redirectAttributes) {
         byte[] bytes = (byte[]) session.getAttribute(READER_IMPORT_BYTES);
         if (bytes == null) {
@@ -176,6 +184,43 @@ public class ReaderController {
     @PreAuthorize("hasAuthority('READER_VIEW')")
     public ResponseEntity<byte[]> exportCsv() {
         return csvResponse("readers.csv", readerService.exportCsv());
+    }
+
+    @GetMapping("/trash")
+    @PreAuthorize("hasAuthority('READER_DELETE')")
+    public String trash(@RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "30") int size,
+                        Model model) {
+        int pageSize = Math.min(Math.max(size, 1), 100);
+        model.addAttribute("readers", readerService.trash(PageRequest.of(Math.max(page, 0), pageSize, Sort.by(Sort.Direction.DESC, "updateTime"))));
+        model.addAttribute("pageSize", pageSize);
+        return "reader/trash";
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize("hasAuthority('READER_DELETE')")
+    @PreventDuplicateSubmit
+    public String restore(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            readerService.restore(id);
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.reader.restored"));
+        } catch (IllegalStateException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/readers/trash";
+    }
+
+    @PostMapping("/{id}/purge")
+    @PreAuthorize("hasAuthority('READER_DELETE')")
+    @PreventDuplicateSubmit
+    public String purge(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            readerService.purge(id);
+            redirectAttributes.addFlashAttribute("message", i18n.get("flash.reader.purged"));
+        } catch (IllegalStateException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/readers/trash";
     }
 
     private void rememberErrorReport(HttpSession session, String key, ImportResult result) {

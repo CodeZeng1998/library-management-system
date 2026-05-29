@@ -10,11 +10,13 @@ import com.codezeng.lms.repository.BorrowRecordRepository;
 import com.codezeng.lms.repository.FineRecordRepository;
 import com.codezeng.lms.repository.ReaderRepository;
 import com.codezeng.lms.security.DataScopeService;
+import com.codezeng.lms.security.PreventDuplicateSubmit;
 import com.codezeng.lms.service.BorrowService;
 import com.codezeng.lms.service.I18nMessageService;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -27,10 +29,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,7 +41,6 @@ import java.util.List;
 @RequestMapping("/borrow")
 public class BorrowController {
 
-    private static final BigDecimal OVERDUE_FINE_PER_DAY = new BigDecimal("0.10");
     private static final List<BorrowStatus> ACTIVE_STATUSES = List.of(BorrowStatus.BORROWED, BorrowStatus.OVERDUE);
 
     private final BookRepository bookRepository;
@@ -70,11 +72,25 @@ public class BorrowController {
     @PreAuthorize("hasAuthority('BORROW_MANAGE')")
     public String records(@RequestParam(defaultValue = "0") int page,
                           @RequestParam(defaultValue = "30") int size,
+                          @RequestParam(required = false) BorrowStatus status,
+                          @RequestParam(required = false) String keyword,
                           Model model) {
-        int pageSize = Math.min(Math.max(size, 1), 100);
-        model.addAttribute("records", borrowRecordRepository.findAll(dataScopeService.borrowRecordScope(), PageRequest.of(page, pageSize, Sort.by(Sort.Direction.DESC, "createTime"))));
+        int pageSize = borrowService.normalizePageSize(size);
+        Page<BorrowRecord> records = borrowService.search(status, keyword, page, pageSize);
+        model.addAttribute("records", records);
+        model.addAttribute("statuses", BorrowStatus.values());
+        model.addAttribute("status", status);
+        model.addAttribute("keyword", keyword);
         model.addAttribute("pageSize", pageSize);
+        model.addAttribute("queryString", queryString(status, keyword, pageSize));
         return "borrow/list";
+    }
+
+    @GetMapping("/export")
+    @PreAuthorize("hasAuthority('BORROW_MANAGE')")
+    public ResponseEntity<byte[]> exportCsv(@RequestParam(required = false) BorrowStatus status,
+                                            @RequestParam(required = false) String keyword) {
+        return csvResponse("borrow-records.csv", borrowService.exportCsv(status, keyword));
     }
 
     @GetMapping("/new")
@@ -85,6 +101,7 @@ public class BorrowController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('BORROW_MANAGE')")
+    @PreventDuplicateSubmit
     public String borrow(@RequestParam Long bookId,
                          @RequestParam Long readerId,
                          RedirectAttributes redirectAttributes) {
@@ -99,6 +116,7 @@ public class BorrowController {
 
     @PostMapping("/{id}/return")
     @PreAuthorize("hasAuthority('BORROW_MANAGE')")
+    @PreventDuplicateSubmit
     public String returnBook(@PathVariable Long id,
                              @RequestParam(defaultValue = "false") boolean damaged,
                              @RequestParam(defaultValue = "false") boolean lost,
@@ -110,6 +128,7 @@ public class BorrowController {
 
     @PostMapping("/{id}/renew")
     @PreAuthorize("hasAuthority('BORROW_MANAGE')")
+    @PreventDuplicateSubmit
     public String renew(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
             borrowService.renew(id);
@@ -122,6 +141,7 @@ public class BorrowController {
 
     @PostMapping("/overdue-scan")
     @PreAuthorize("hasAuthority('BORROW_MANAGE')")
+    @PreventDuplicateSubmit
     public String overdueScan(RedirectAttributes redirectAttributes) {
         borrowService.markOverdueRecords();
         redirectAttributes.addFlashAttribute("message", i18n.get("flash.borrow.overdueScan"));
@@ -141,6 +161,7 @@ public class BorrowController {
     @PostMapping("/api/checkout")
     @ResponseBody
     @PreAuthorize("hasAuthority('BORROW_MANAGE')")
+    @PreventDuplicateSubmit
     public ResponseEntity<ActionResponse> checkout(@RequestParam String readerNo,
                                                    @RequestParam String isbn) {
         try {
@@ -170,6 +191,7 @@ public class BorrowController {
     @PostMapping("/api/returns/batch")
     @ResponseBody
     @PreAuthorize("hasAuthority('BORROW_MANAGE')")
+    @PreventDuplicateSubmit
     public ResponseEntity<ReturnBatchResponse> batchReturn(@RequestBody ReturnBatchRequest request) {
         if (request == null || request.items() == null || request.items().isEmpty()) {
             return ResponseEntity.badRequest().body(new ReturnBatchResponse(false, i18n.get("borrow.returnQueue.empty"), List.of(), List.of(), BigDecimal.ZERO));
@@ -197,6 +219,7 @@ public class BorrowController {
     @PostMapping("/api/renew")
     @ResponseBody
     @PreAuthorize("hasAuthority('BORROW_MANAGE')")
+    @PreventDuplicateSubmit
     public ResponseEntity<ActionResponse> renewByScan(@RequestParam String isbn) {
         try {
             BorrowRecord record = borrowRecordRepository
@@ -213,6 +236,7 @@ public class BorrowController {
     @PostMapping("/api/renew/{id}")
     @ResponseBody
     @PreAuthorize("hasAuthority('BORROW_MANAGE')")
+    @PreventDuplicateSubmit
     public ResponseEntity<ActionResponse> renewById(@PathVariable Long id) {
         try {
             BorrowRecord renewed = borrowService.renew(id);
@@ -223,14 +247,15 @@ public class BorrowController {
     }
 
     private ReaderCard toReaderCard(Reader reader) {
-        long activeBorrowCount = borrowRecordRepository.countByReaderAndStatusIn(reader, ACTIVE_STATUSES);
-        boolean hasOverdue = borrowRecordRepository.existsByReaderAndStatusAndDueDateBefore(reader, BorrowStatus.BORROWED, LocalDate.now());
-        boolean hasUnpaidFine = fineRecordRepository.existsByReaderAndStatus(reader, FineStatus.UNPAID);
+        long activeBorrowCount = borrowRecordRepository.countByReaderAndStatusInAndDeletedFalse(reader, ACTIVE_STATUSES);
+        boolean hasOverdue = borrowRecordRepository.existsByReaderAndStatusAndDueDateBeforeAndDeletedFalse(reader, BorrowStatus.BORROWED, LocalDate.now());
+        boolean hasUnpaidFine = fineRecordRepository.existsByReaderAndStatusAndDeletedFalse(reader, FineStatus.UNPAID);
         List<String> blockers = new ArrayList<>();
         if (reader.getStatus() != AccountStatus.NORMAL) {
             blockers.add(i18n.get("api.borrow.blocker.accountStatus"));
         }
-        if (activeBorrowCount >= reader.getMemberLevel().getMaxBorrowBooks()) {
+        int maxBorrowBooks = borrowService.maxBorrowBooks(reader);
+        if (activeBorrowCount >= maxBorrowBooks) {
             blockers.add(i18n.get("api.borrow.blocker.maxBorrow"));
         }
         if (hasOverdue) {
@@ -247,7 +272,7 @@ public class BorrowController {
                 i18n.enumLabel("status", reader.getStatus()),
                 reader.getDepositAmount(),
                 activeBorrowCount,
-                reader.getMemberLevel().getMaxBorrowBooks(),
+                maxBorrowBooks,
                 hasOverdue,
                 hasUnpaidFine,
                 blockers.isEmpty(),
@@ -271,15 +296,33 @@ public class BorrowController {
     }
 
     private BigDecimal estimateFine(BorrowRecord record, boolean damaged, boolean lost) {
-        long overdueDays = ChronoUnit.DAYS.between(record.getDueDate(), LocalDate.now());
-        BigDecimal fine = overdueDays <= 0 ? BigDecimal.ZERO : OVERDUE_FINE_PER_DAY.multiply(BigDecimal.valueOf(overdueDays));
-        if (lost && record.getBook().getPrice() != null) {
-            return fine.add(record.getBook().getPrice().multiply(new BigDecimal("2.00")));
+        return borrowService.estimateFine(record, damaged, lost);
+    }
+
+    private String queryString(BorrowStatus status, String keyword, int size) {
+        UriComponentsBuilder builder = UriComponentsBuilder.newInstance();
+        queryParam(builder, "status", status);
+        queryParam(builder, "keyword", keyword);
+        builder.queryParam("size", size);
+        String query = builder.build().encode().toUriString();
+        return query.startsWith("?") ? "&" + query.substring(1) : query;
+    }
+
+    private void queryParam(UriComponentsBuilder builder, String name, Object value) {
+        if (value == null) {
+            return;
         }
-        if (damaged && record.getBook().getPrice() != null) {
-            return fine.add(record.getBook().getPrice().multiply(new BigDecimal("0.50")));
+        String text = String.valueOf(value);
+        if (!text.isBlank()) {
+            builder.queryParam(name, text);
         }
-        return fine;
+    }
+
+    private ResponseEntity<byte[]> csvResponse(String filename, String csv) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .body(csv.getBytes(StandardCharsets.UTF_8));
     }
 
     public record ReaderLookupResponse(boolean success, String message, ReaderCard reader) {

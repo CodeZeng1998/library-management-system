@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="|#{dashboard.title} - #{app.name}|">Dashboard - Library Management System</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.18/dist/css/layui.min.css">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
@@ -13,11 +14,15 @@
     <main class="content">
         <div class="topbar">
             <h1 class="page-title" th:text="#{dashboard.title}">Dashboard</h1>
-            <form th:action="@{/logout}" method="post">
-                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                <span sec:authentication="name"></span>
-                <button class="layui-btn layui-btn-sm layui-btn-primary" type="submit" th:text="#{common.logout}">Log out</button>
-            </form>
+            <div class="table-actions">
+                <a class="layui-btn layui-btn-sm layui-btn-primary" th:href="@{/}" th:text="#{common.refresh}">Refresh</a>
+                <a class="layui-btn layui-btn-sm" th:href="@{/dashboard/export}" th:text="#{common.exportCsv}">Export CSV</a>
+                <form th:action="@{/logout}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                    <span sec:authentication="name"></span>
+                    <button class="layui-btn layui-btn-sm layui-btn-primary" type="submit" th:text="#{common.logout}">Log out</button>
+                </form>
+            </div>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
 

@@ -13,6 +13,8 @@ public enum Permission {
     BOOK_EDIT("Create or edit books", UserRole.SUPER_ADMIN),
     BOOK_DELETE("Delete books", UserRole.SUPER_ADMIN),
     BOOK_IMPORT("Import books", UserRole.SUPER_ADMIN),
+    CATEGORY_MANAGE("Manage book categories", UserRole.SUPER_ADMIN),
+    TAG_MANAGE("Manage book tags", UserRole.SUPER_ADMIN),
     READER_VIEW("Reader menu and query", UserRole.SUPER_ADMIN),
     READER_EDIT("Create or edit readers", UserRole.SUPER_ADMIN),
     READER_DELETE("Delete readers", UserRole.SUPER_ADMIN),
